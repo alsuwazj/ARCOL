@@ -1,0 +1,3 @@
+/home/alsuwazj/HolaCmake/build/CMakeFiles/HolaCmake.dir
+/home/alsuwazj/HolaCmake/build/CMakeFiles/edit_cache.dir
+/home/alsuwazj/HolaCmake/build/CMakeFiles/rebuild_cache.dir
