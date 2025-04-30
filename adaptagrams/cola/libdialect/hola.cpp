@@ -119,6 +119,7 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     log(*core, string_format("%02d_core", ln++));
 
 
+
     // If it's just a tree, layout and quit.
     // We recognise this case by there being exactly one tree, containing the same number of
     // nodes as the original graph.
@@ -165,71 +166,159 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
 
         // Step 2: Process each tree
     std::map<Tree_SP, Node_SP> tree2box; //Each Tree_SP has a corresponding bounding box node
-        for (Tree_SP tree : trees) {
-            Node_SP treeRoot = tree->getRootNode();
-
-// Step 3: Compute bounding box for tree (excluding root)
-            Node_SP bboxNode = tree->buildRootlessBox(holaOpts.defaultTreeGrowthDir);
-
-            if (!bboxNode) {
-                std::cerr << "Error: Could not compute bounding box for tree rooted at " << treeRoot->id() << "!\n";
-                continue;
-            }
-
-// Step 4: Add bounding box node to the core graph
-            core->addNode(bboxNode);
-
-// Step 5: Connect bounding box node to the tree root with an edge
-            Edge_SP bboxEdge = Edge::allocate(bboxNode, treeRoot);  // use tree's internal root
-            core->addEdge(bboxEdge);
-
-            tree2box[tree] = bboxNode;
-
-// Step 6: Log progress
-            log(*core, string_format("%02d_%02d_add_tree_bounding_box", ln, lns++));
-
-
+    for (Tree_SP tree : trees) {
+        id_type rootID = tree->getRootNode()->id();
+        Node_SP coreRoot;
+        try {
+            coreRoot = core->getNode(rootID);  // use the root node inside the core
+        } catch (const std::out_of_range&) {
+            std::cerr << "Error: Root node ID " << rootID << " not found in core graph!\n";
+            continue;  // skip this tree
         }
+
+        // Step 3: Compute bounding box for tree (excluding root)
+        Node_SP bboxNode = tree->buildRootlessBox(holaOpts.defaultTreeGrowthDir);
+        if (!bboxNode) {
+            std::cerr << "Error: Could not compute bounding box for tree rooted at " << rootID << "!\n";
+            continue;
+        }
+
+        // Step 4: Add bounding box node to the core graph
+        core->addNode(bboxNode);
+
+        // Step 5: Connect bounding box node to the root node in core
+        Edge_SP bboxEdge = Edge::allocate(bboxNode, coreRoot);
+        core->addEdge(bboxEdge);
+
+        // Save mapping for later
+        tree2box[tree] = bboxNode;
+
+        // Step 6: Log progress
+        log(*core, string_format("%02d_%02d_add_tree_bounding_box", ln, lns++));
+    }
 
     // Start with a plain destress (de-stress)-- no constraints, no overlap prevention -- in order to begin
     // giving the nodes a reasonable distribution in the plane.
 
     ColaOptions colaOpts;
+// === Step 1: Estimate base spacing factor ===
+// You can make this dynamic using graph density or max degree
+//    double aspectRatio =2.5;
+//    double spacingFactor = 1.2; // tweakable (e.g., 1.0–1.5)
+//    // Let the spacing factor vary smoothly based on how far we are from 1.0 (square)
+//    //Smooth Sigmoid-like Scaling
+//    double smoothFactor = 1.0 + 0.2 * ((aspectRatio - 1.0) / (aspectRatio + 1.0));  // ∈ [~0.8, ~1.2]
+//    spacingFactor *= smoothFactor;
+//
+//
+//// === Step 2: Compute Ideal Edge Length (IEL) ===
+//// Use average node size and spacing factor to derive IEL
+//    double avgNodeSize = Gcopy->computeAvgNodeDim(); // avg of width and height
+//
+////    double totalNodeArea = 0.0;
+////    for (auto& rect : Gcopy->boundingBoxes) {
+////        double nodeArea = rect->width() * rect->height();
+////        totalNodeArea += nodeArea;
+////    }
+//    //IEL = avgNodeSize * spacingFactor;        // base spacing between nodes
+//
+//// === Step 3: Derive per-node area from IEL ===
+//// This assumes nodes are roughly IEL apart, forming a grid-like layout
+////since IEL is now including the AVGnodesize we can use that
+//    double areaPerNode = IEL * IEL;  //avgNodeSize * avgNodeSize * spacingFactor;
+//
+//
+//// === Step 4: Estimate total layout area needed ===
+//    int numNodes = core->getNumNodes();
+//    double layoutArea = areaPerNode *numNodes;
+//
+//// === Step 5: Choose aspect ratio (w/h) and compute layout dimensions ===
+//// Example: 0.33 = tall; 2.5 = wide
+//
+//    double height = sqrt(layoutArea / aspectRatio)  +40;
+//    double width  = aspectRatio * height  +40;
+//
+//   // double safetyMargin = 0.2;  // 10% extra room
+//    *sharedWidth  = width  ;//* (1.0 + safetyMargin);
+//    *sharedHeight = height ;//* (1.0 + safetyMargin);
+//
+//// === Step 7: Save to ColaOptions for layout and constraints ===
+//    colaOpts.newHeight = sharedHeight;
+//    colaOpts.newWidth  = sharedWidth;
+//    colaOpts.idealEdgeLength = IEL;
 
-    //z: Estimate How Much Space Each Node Needs:
-    double avgnode = Gcopy->computeAvgNodeDim();
-    double areaPerNode = avgnode * avgnode * 2;
+// === Step 8: Register IEL in the graph copy ===
+    //Gcopy->setIEL(IEL);
 
-    // Compute Total Area For N nodes:
-    int numNodes = G.getNumNodes();
-    double layoutArea = areaPerNode * numNodes;
+    //skeleton force
+    // Parameters
+    int num_ghost_per_axis = 10;
+    double aspectRatio = 2.0; // e.g., wider than tall
+    //double IEL = G.getIEL();
+    double width = sqrt(core->getNumNodes() * IEL * IEL * aspectRatio);
+    double height = width / aspectRatio;
+    double centerX = width / 2.0;
+    double centerY = height / 2.0;
 
-    //Z: target aspect ratio
-    double aspectRatio = 2.5;
-    //Compute Width and Height from Aspect Ratio and layout area
-    double height = sqrt(layoutArea / aspectRatio);
-    double width = aspectRatio * height;
+// Add ghost nodes in a cross shape
+    std::vector<Node_SP> ghostNodes;
 
-    *sharedHeight = height;
-    *sharedWidth = width;
+// Horizontal (x-axis)
+    for (int i = 0; i < num_ghost_per_axis; ++i) {
+        double x = i * (width / (num_ghost_per_axis - 1));
+        ghostNodes.push_back(core->addNode(x, centerY, 0.01, 0.01));  // small node
+    }
 
-    colaOpts.newHeight = std::make_shared<double>(height);
-    colaOpts.newWidth  = std::make_shared<double>(width);
+// Vertical (y-axis)
+    for (int i = 0; i < num_ghost_per_axis; ++i) {
+        double y = i * (height / (num_ghost_per_axis - 1));
+        ghostNodes.push_back(core->addNode(centerX, y, 0.01, 0.01));  // small node
+    }
+//add edges
+    for (const auto& kv : core->getNodeLookup()) {
+        Node_SP realNode = kv.second;
+        if (realNode->getBoundingBox().w() > 0.05) {  // skip ghost nodes
+            // Find nearest ghost node
+            Node_SP nearest = nullptr;
+            double bestDist = DBL_MAX;
+            for (Node_SP ghost : ghostNodes) {
+                double dx = ghost->getCentre().x - realNode->getCentre().x;
+                double dy = ghost->getCentre().y - realNode->getCentre().y;
+                double d2 = dx*dx + dy*dy;
+                if (d2 < bestDist) {
+                    bestDist = d2;
+                    nearest = ghost;
+                }
+            }
+            // Add edge with small weight (in IEL vector later)
+            Edge_SP e = core->addEdge(realNode, nearest);
+            // Store somewhere you can mark this edge as "light" if needed
+        }
+    }
+    const auto& edges = core->getEdgeLookup();
 
-    //Once I know the size of the layout area, I want to spread nodes uniformly.
-    //Z: compute the IEL
-    //this IEL is used in three places: hola, cola, aca
-    IEL = sqrt(areaPerNode) * 1.2; // 1.2 is spacing factor, it affects the layout a lot
+    for (const auto& [eid, edge] : edges)  {
+        auto dims1 = edge->getSourceEnd()->getDimensions();
+        auto dims2 = edge->getTargetEnd()->getDimensions();
 
-    //maybe I sue the nodes degree or density
-//    double spacingFactor = 1.0 + 0.05 * Gcopy->getMaxDegree(); // or 0.1 if layout is very dense
-//    IEL = sqrt(areaPerNode) * spacingFactor;
-    colaOpts.idealEdgeLength = IEL;
-    Gcopy->setIEL(IEL);
-
+        bool isGhost = (dims1.first < 0.05 && dims1.second < 0.05)
+                       || (dims2.first < 0.05 && dims2.second < 0.05);
+        colaOpts.eLengths.push_back(isGhost ? 0.5 : 1.0);
+    }
 
     core->destress(colaOpts); //first round of FD layout
     log(*core, string_format("%02d_free_destress_core", ln++));
+
+    BoundingBox bbox = core->getBoundingBox();
+    double width1 = bbox.w();
+    double height1 = bbox.h();
+
+    if (height1 != 0.0) {
+        double aspectRatio1 = width1 / height1;
+        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
+    } else {
+        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
+    }
 
     //z:
 
@@ -258,9 +347,8 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
 //    log(*core, string_format("%02d_free2_destress_core", ln++));
 
 
-    // Now destress again, this time removing any node overlaps.
 
-    //second round
+
 
 
     //Z
@@ -277,11 +365,23 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
 //    std::cout << "old w: "<< bboxOrig.w() << "new w: "<< colaOpts.newWidth <<std::endl;
 
     colaOpts.preventOverlaps = true;
+    std::cout <<"non overlap is added now" << std::endl;
+    // Now destress again, this time removing any node overlaps.
     core->destress(colaOpts); //second round of FD layout
     //colaOpts.aspectRatioCons =false;
     //std::cout <<core->getBoundingBox().w() << "  "<< core->getBoundingBox().h()<<std::endl;
     log(*core, string_format("%02d_OP_destress_core", ln++));
 
+     bbox = core->getBoundingBox();
+     width1 = bbox.w();
+     height1 = bbox.h();
+
+    if (height1 != 0.0) {
+        double aspectRatio1 = width1 / height1;
+        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
+    } else {
+        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
+    }
 
     // Layout the hubs.
     nli(ln); // this for the logger
@@ -291,6 +391,17 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     ohl.layout(logger);
 
     log(*core, string_format("%02d_core_ortho_hub", ln++));
+
+    bbox = core->getBoundingBox();
+    width1 = bbox.w();
+    height1 = bbox.h();
+
+    if (height1 != 0.0) {
+        double aspectRatio1 = width1 / height1;
+        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
+    } else {
+        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
+    }
 
     // Set extra gap for boundary constraints.
     core->getSepMatrix().setExtraBdryGap(IEL/2.0); // spacing between nodes
@@ -306,6 +417,17 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     core->destress(colaOpts); // another FD layout for minimizing the stress after orthogonalizing with extar gap //here the chains will be smoothed
 
     log(*core, string_format("%02d_EOP_destress_core", ln++));
+
+    bbox = core->getBoundingBox();
+    width1 = bbox.w();
+    height1 = bbox.h();
+
+    if (height1 != 0.0) {
+        double aspectRatio1 = width1 / height1;
+        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
+    } else {
+        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
+    }
 
     // Next we lay out the links.
     // We may or may not build Chains for this process. Later we will need to know whether chains
@@ -352,6 +474,17 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         log(*core, string_format("%02d_core_link_config_ACA", ln++));
     } else {
         log(*core, string_format("%02d_core_link_config_Chains", ln++));
+    }
+
+    bbox = core->getBoundingBox();
+    width1 = bbox.w();
+    height1 = bbox.h();
+
+    if (height1 != 0.0) {
+        double aspectRatio1 = width1 / height1;
+        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
+    } else {
+        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
     }
 
     //z
