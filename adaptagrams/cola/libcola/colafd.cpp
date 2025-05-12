@@ -50,6 +50,9 @@
 // may mess up C++ std library include on GCC 4.4
 #include "libcola/cola_log.h"
 
+#include "libdialect/logging.h"
+
+
 using namespace std;
 using vpsc::Dim;
 using vpsc::XDIM;
@@ -150,7 +153,7 @@ ConstrainedFDLayout::ConstrainedFDLayout(const vpsc::Rectangles& rs,
         G[i]=new unsigned short[n];
     }
 
-    std::cout<<"calling compute path "<<std::endl;
+
     computePathLengths(es,m_edge_lengths);
 }
 
@@ -312,12 +315,14 @@ void ConstrainedFDLayout::computeDescentVectorOnBothAxes(
     setPosition(x0);
     //z: compute the forces twice in each direction because VPSC is 1D solve for X and Y separately.
     // this is easier to control the constraints
+
     if(xAxis) {
         applyForcesAndConstraints(vpsc::HORIZONTAL,stress);
     }
     if(yAxis) {
         applyForcesAndConstraints(vpsc::VERTICAL,stress);
     }
+
     getPosition(X,Y,x1);
 }
 
@@ -356,7 +361,7 @@ void ConstrainedFDLayout::run(const bool xAxis, const bool yAxis)
         unsigned N=2*n;
         Position x0(N),x1(N);
         getPosition(X,Y,x0);
-        if(rungekutta) {
+        if(rungekutta) { //this is what is used
             Position a(N),b(N),c(N),d(N),ia(N),ib(N);
             computeDescentVectorOnBothAxes(xAxis,yAxis,stress,x0,a);
             ia=x0+(a-x0)/2.0;
@@ -373,10 +378,37 @@ void ConstrainedFDLayout::run(const bool xAxis, const bool yAxis)
         stress=computeStress();
         FILE_LOG(logDEBUG) << "stress="<<stress;
     } while(!(*done)(stress,X,Y));
+
+
+
+//        for (unsigned i = 0; i < n; ++i) {
+//        X[i] /= sx;
+//        Y[i] /= sy;
+//    }
+//    moveBoundingBoxes();
+//    double xmin = X[0], xmax = X[0];
+//    double ymin = Y[0], ymax = Y[0];
+//
+//    for (size_t i = 1; i < X.size(); ++i) {
+//        if (X[i] < xmin) xmin = X[i];
+//        if (X[i] > xmax) xmax = X[i];
+//        if (Y[i] < ymin) ymin = Y[i];
+//        if (Y[i] > ymax) ymax = Y[i];
+//    }
+//
+//    double adjusted_width  = (xmax - xmin) / sx;
+//    double adjusted_height = (ymax - ymin) / sy;
+//    double ar = adjusted_width / adjusted_height;
+//    printf("Adjusted AR (W/H): %.5f\n", ar);
+
+
+
+
     for(unsigned i=0;i<n;i++) {
         vpsc::Rectangle *r=boundingBoxes[i];
     FILE_LOG(logDEBUG) << *r;
     }
+
     FILE_LOG(logDEBUG) << "ConstrainedFDLayout::run done.";
 
     // Clear extra constraints.
@@ -1137,7 +1169,7 @@ double ConstrainedFDLayout::applyForcesAndConstraints(const vpsc::Dim dim, const
     setupVarsAndConstraints(n, ccs, dim, boundingBoxes,
             clusterHierarchy, vs, cs, coords);
 
-    if (topologyAddon->useTopologySolver())
+    if (topologyAddon->useTopologySolver()) //false in hola
     {
         stress = topologyAddon->applyForcesAndConstraints(this, dim, g, vs, cs,
                 coords, des, oldStress);
@@ -1151,18 +1183,46 @@ double ConstrainedFDLayout::applyForcesAndConstraints(const vpsc::Dim dim, const
 
 
         valarray<double> oldCoords=coords;
-        applyDescentVector(g,oldCoords,coords,oldStress,computeStepSize(H,g,g),dim);
+        applyDescentVector(g,oldCoords,coords,oldStress,computeStepSize(H,g,g),dim,true);
 
+//        double minX = X[0], maxX = X[0], minY = Y[0], maxY = Y[0];
+//        for (int i = 1; i < n; ++i) {
+//            if (X[i] < minX) minX = X[i];
+//            if (X[i] > maxX) maxX = X[i];
+//            if (Y[i] < minY) minY = Y[i];
+//            if (Y[i] > maxY) maxY = Y[i];
+//        }
+//        double widthBefore = maxX - minX;
+//        double heightBefore = maxY - minY;
+//        double aspectBefore = widthBefore / heightBefore;
+//        std::cout << "Before VPSC projection: width=" << widthBefore
+//                  << " height=" << heightBefore
+//                  << " aspect=" << aspectBefore << std::endl;
 
         setVariableDesiredPositions(vs,cs,des,coords);
         project(vs,cs,coords);
+//        minX = maxX = X[0];
+//        minY = maxY = Y[0];
+//        for (int i = 1; i < n; ++i) {
+//            if (X[i] < minX) minX = X[i];
+//            if (X[i] > maxX) maxX = X[i];
+//            if (Y[i] < minY) minY = Y[i];
+//            if (Y[i] > maxY) maxY = Y[i];
+//        }
+//        double widthAfter = maxX - minX;
+//        double heightAfter = maxY - minY;
+//        double aspectAfter = widthAfter / heightAfter;
+//        std::cout << "After VPSC projection: width=" << widthAfter
+//                  << " height=" << heightAfter
+//                  << " aspect=" << aspectAfter << std::endl;
 
         valarray<double> d(n);
         d=oldCoords-coords;
         double stepsize=computeStepSize(H,g,d);
+
         stepsize=max(0.,min(stepsize,1.));
         //printf(" dim=%d beta: ",dim);
-        stress = applyDescentVector(d,oldCoords,coords,oldStress,stepsize,dim); //measuring how bad the current layout is
+        stress = applyDescentVector(d,oldCoords,coords,oldStress,stepsize,dim,false); //measuring how bad the current layout is
         moveBoundingBoxes();
     }
     updateCompoundConstraints(dim, ccs);
@@ -1196,22 +1256,17 @@ double ConstrainedFDLayout::applyDescentVector(
         valarray<double> &coords,
         const double oldStress,
         double stepsize,
-        const vpsc::Dim dim
+        const vpsc::Dim dim,
+        bool dIsScaled
         )
 {
     COLA_UNUSED(oldStress);
 
     COLA_ASSERT(d.size()==oldCoords.size());
     COLA_ASSERT(d.size()==coords.size());
+    double scale = (dim == vpsc::HORIZONTAL) ? sx : sy;
     while(fabs(stepsize)>0.00000000001) {
         coords=oldCoords-stepsize*d;
-//        for (unsigned i = 0; i < coords.size(); ++i) {
-//            double scale = (dim == vpsc::HORIZONTAL) ? sx : sy;
-//            coords[i] = oldCoords[i] - stepsize * d[i] / scale;
-//
-//        }
-
-
 
 
         double stress=computeStress();
@@ -1264,10 +1319,17 @@ void ConstrainedFDLayout::computeForces(
         if(GLOBAL_ASPECT_RATIO <= 1.0){
              sx = 1.0 ;
              sy =  1.0 / GLOBAL_ASPECT_RATIO;
+             //std::cout<<"sy "<<sy<<std::endl;
         } else {
-            sx = 1.0 / GLOBAL_ASPECT_RATIO;
+            sx =  GLOBAL_ASPECT_RATIO;
             sy = 1.0 ;
         }
+
+
+//        sx = sqrt(GLOBAL_ASPECT_RATIO);
+//        sy = 1.0 / sqrt(GLOBAL_ASPECT_RATIO);
+
+
         for(unsigned u=0;u<n;u++) {
             // Stress model
             double Huu=0;
@@ -1275,17 +1337,14 @@ void ConstrainedFDLayout::computeForces(
                 //compute forces between node pairs (u, v) that are either connected or have some relationship, depending on m_useNeighbourStress.
                 if(u==v) continue;
                 if (m_useNeighbourStress && neighbours[u][v]!=1) continue;
-
                 // The following loop randomly displaces nodes that are at identical positions
                 double rx=X[u]-X[v], ry=Y[u]-Y[v];
-                //double sd2 = rx*rx+ry*ry;
+//                double sd2 = rx*rx+ry*ry;
                 double ax = rx / sx; // divide to penalize one direction
                 double ay = ry / sy;
-                double sd2 = ax*ax + ay*ay;
-
+                double sd2 = ax * ax + ay * ay ;
 
                 unsigned maxDisplaces = n;  // avoid infinite loop in the case of numerical issues, such as huge values
-
                 while (maxDisplaces--)
                 {
                     //If u and v are too close (sd2 ≈ 0), apply a small random displacement to node v to avoid division by zero.
@@ -1299,9 +1358,11 @@ void ConstrainedFDLayout::computeForces(
                     X[v] += rd[0];
                     Y[v] += rd[1];
                     rx=X[u]-X[v], ry=Y[u]-Y[v];
+                    //sd2 = rx*rx+ry*ry;
                     ax = rx / sx;
                     ay = ry / sy;
                     sd2 = ax*ax + ay*ay;
+
                 }
 
                 unsigned short p = G[u][v]; //the force type matrix
@@ -1320,6 +1381,9 @@ void ConstrainedFDLayout::computeForces(
 //                g[u]+=dx*(l-d)/(d2*l);
 //                Huu-=H(u,v)=(d*dy*dy/(l*l*l)-1)/d2;
                 // Use biased delta for gradient:
+
+
+                // Gradient component (descent direction)
                 double delta = (dim == vpsc::HORIZONTAL) ? ax : ay;
                 g[u] += delta * (l - d) / (d2 * l);
 
@@ -1386,7 +1450,7 @@ double ConstrainedFDLayout::computeStress() const {
             // no forces between disconnected parts of the graph
             if(p==0) continue;
             double rx=X[u]-X[v], ry=Y[u]-Y[v];
-            //double l=sqrt((rx*rx)+ (ry*ry));
+//            double l=sqrt((rx*rx)+ (ry*ry));
             double ax = rx / sx;
             double ay = ry / sy;
             double l = sqrt((ax*ax) + (ay*ay));
