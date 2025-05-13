@@ -513,6 +513,30 @@ adaptagrams/cola/libdialect/routing.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/routing.cpp.s
 .PHONY : adaptagrams/cola/libdialect/routing.cpp.s
 
+adaptagrams/cola/libdialect/sides.o: adaptagrams/cola/libdialect/sides.cpp.o
+.PHONY : adaptagrams/cola/libdialect/sides.o
+
+# target to build an object file
+adaptagrams/cola/libdialect/sides.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o
+.PHONY : adaptagrams/cola/libdialect/sides.cpp.o
+
+adaptagrams/cola/libdialect/sides.i: adaptagrams/cola/libdialect/sides.cpp.i
+.PHONY : adaptagrams/cola/libdialect/sides.i
+
+# target to preprocess a source file
+adaptagrams/cola/libdialect/sides.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.i
+.PHONY : adaptagrams/cola/libdialect/sides.cpp.i
+
+adaptagrams/cola/libdialect/sides.s: adaptagrams/cola/libdialect/sides.cpp.s
+.PHONY : adaptagrams/cola/libdialect/sides.s
+
+# target to generate assembly for a file
+adaptagrams/cola/libdialect/sides.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.s
+.PHONY : adaptagrams/cola/libdialect/sides.cpp.s
+
 adaptagrams/cola/libdialect/treeplacement.o: adaptagrams/cola/libdialect/treeplacement.cpp.o
 .PHONY : adaptagrams/cola/libdialect/treeplacement.o
 
@@ -618,6 +642,9 @@ help:
 	@echo "... adaptagrams/cola/libdialect/routing.o"
 	@echo "... adaptagrams/cola/libdialect/routing.i"
 	@echo "... adaptagrams/cola/libdialect/routing.s"
+	@echo "... adaptagrams/cola/libdialect/sides.o"
+	@echo "... adaptagrams/cola/libdialect/sides.i"
+	@echo "... adaptagrams/cola/libdialect/sides.s"
 	@echo "... adaptagrams/cola/libdialect/treeplacement.o"
 	@echo "... adaptagrams/cola/libdialect/treeplacement.i"
 	@echo "... adaptagrams/cola/libdialect/treeplacement.s"

@@ -315,4 +315,18 @@ CMakeFiles/HolaCmake.dir/main.cpp.o: /home/alsuwazj/HolaCmake/main.cpp \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/opts.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/logging.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/hola.h \
- /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/io.h
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/io.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/nodeconfig.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/util.h \
+ /usr/include/c++/13/math.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/aca.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/quadaction.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libcola/cola_log.h \
+ /usr/include/c++/13/iomanip /usr/include/c++/13/locale \
+ /usr/include/c++/13/bits/locale_facets_nonio.h \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/messages_members.h \
+ /usr/include/libintl.h /usr/include/c++/13/bits/locale_facets_nonio.tcc \
+ /usr/include/c++/13/bits/locale_conv.h \
+ /usr/include/c++/13/bits/quoted_string.h \
+ /usr/include/x86_64-linux-gnu/sys/time.h

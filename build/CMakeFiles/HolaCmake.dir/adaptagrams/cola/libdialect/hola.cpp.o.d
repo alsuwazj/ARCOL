@@ -323,10 +323,4 @@ CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/hola.cpp.o: \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/faces.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/treeplacement.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/nearalign.h \
- /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/hola.h \
- /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/mytreeplacement.h \
- /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/io.h \
- /usr/include/c++/13/fstream /usr/include/c++/13/bits/codecvt.h \
- /usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h \
- /usr/include/x86_64-linux-gnu/c++/13/bits/c++io.h \
- /usr/include/c++/13/bits/fstream.tcc
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/hola.h

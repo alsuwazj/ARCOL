@@ -313,16 +313,4 @@ CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/logging.cpp.o: \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/ortho.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/routing.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/opts.h \
- /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/logging.h \
- /usr/include/c++/13/filesystem /usr/include/c++/13/bits/fs_fwd.h \
- /usr/include/c++/13/bits/chrono.h /usr/include/c++/13/ratio \
- /usr/include/c++/13/bits/parse_numbers.h \
- /usr/include/c++/13/bits/fs_path.h /usr/include/c++/13/locale \
- /usr/include/c++/13/bits/locale_facets_nonio.h \
- /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h \
- /usr/include/x86_64-linux-gnu/c++/13/bits/messages_members.h \
- /usr/include/libintl.h /usr/include/c++/13/bits/codecvt.h \
- /usr/include/c++/13/bits/locale_facets_nonio.tcc \
- /usr/include/c++/13/bits/locale_conv.h /usr/include/c++/13/iomanip \
- /usr/include/c++/13/bits/quoted_string.h /usr/include/c++/13/codecvt \
- /usr/include/c++/13/bits/fs_dir.h /usr/include/c++/13/bits/fs_ops.h
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/logging.h

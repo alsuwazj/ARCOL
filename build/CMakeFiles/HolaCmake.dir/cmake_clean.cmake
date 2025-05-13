@@ -31,6 +31,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/quadaction.cpp.o.d"
   "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/routing.cpp.o"
   "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/routing.cpp.o.d"
+  "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o"
+  "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o.d"
   "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/treeplacement.cpp.o"
   "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/treeplacement.cpp.o.d"
   "CMakeFiles/HolaCmake.dir/main.cpp.o"
