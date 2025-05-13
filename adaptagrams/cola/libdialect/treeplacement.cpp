@@ -52,7 +52,7 @@ using std::string;
 id_type TreePlacement::nextID = 0;
 
 FaceSet_SP dialect::reattachTrees(Graph_SP core, Trees trees, HolaOpts opts, Logger *logger) {
-    // Z: Finding available spaces for trees
+
     // Set up for logging.
     unsigned ln = logger != nullptr ? logger->nextLoggingIndex : 0;
     unsigned lns = 0;
@@ -60,7 +60,7 @@ FaceSet_SP dialect::reattachTrees(Graph_SP core, Trees trees, HolaOpts opts, Log
         if (logger!=nullptr) logger->log(*core, name);
     };
 
-    // Compute the faces of the core. //Z all possible phases
+    // Compute the faces of the core.
     FaceSet_SP faceset = std::make_shared<FaceSet>(core);
 
     // Sort the Trees into the order in which we want to reattach them.
@@ -86,8 +86,6 @@ FaceSet_SP dialect::reattachTrees(Graph_SP core, Trees trees, HolaOpts opts, Log
             best = chooseBestPlacement(tps, opts);
             // Project, making room for the tree node.
             ps = best->buildBestProjSeq(padding, opts.expansion_doCostlierDimensionFirst, opts.expansion_estimateMethod);
-            //ps = best->buildBestProjSeq(padding, false, ExpansionEstimateMethod::LIMITED);
-
             if (ps == nullptr) {
                 // Best placement had no feasible projection sequence.
                 // Delete it from `tps`, and try next best.
@@ -115,7 +113,7 @@ TreePlacement_SP dialect::chooseBestPlacement(TreePlacements tps, HolaOpts opts)
     TreePlacement_SP bestPlacement = nullptr;
 
     // If favouring cardinal placement, we make this the primary consideration.
-    if (opts.treePlacement_favourCardinal) {
+    if (false && opts.treePlacement_favourCardinal) {
         // Sort so that all cardinal placements come first.
         std::sort(tps.begin(), tps.end(), [](const TreePlacement_SP &a, const TreePlacement_SP &b)->bool{
             return Compass::isCardinal(a->getPlacementDir()) && !Compass::isCardinal(b->getPlacementDir());
@@ -131,7 +129,7 @@ TreePlacement_SP dialect::chooseBestPlacement(TreePlacements tps, HolaOpts opts)
 
     // If we haven't chosen a best placement yet, and we are favouring external placement, then
     // we consider that next.
-    if (bestPlacement == nullptr && opts.treePlacement_favourExternal) {
+    if (false && bestPlacement == nullptr && opts.treePlacement_favourExternal) {
         // Sort so that all external placements come first.
         std::sort(tps.begin(), tps.end(), [](const TreePlacement_SP &a, const TreePlacement_SP &b)->bool{
             return a->isExternal() && !b->isExternal();
@@ -147,7 +145,7 @@ TreePlacement_SP dialect::chooseBestPlacement(TreePlacements tps, HolaOpts opts)
 
     // If we haven't chosen a best placement yet, and we are favouring isolation, then
     // we consider that next.
-    if (bestPlacement == nullptr && opts.treePlacement_favourIsolation) {
+    if (false && bestPlacement == nullptr && opts.treePlacement_favourIsolation) {
         // Build a lookup of number of potential neighbours, by TreePlacement ID.
         // Also determine the minimal number.
         std::map<id_type, size_t> numPotNbrs;
@@ -356,5 +354,3 @@ void TreePlacement::insertTreeIntoGraph(Graph &G, NodesById &treeNodes, NodesByI
 bool TreePlacement::rootIsAlignedWith(vpsc::Dim dim, id_type id) {
     return m_rootAligns[dim].count(id) > 0;
 }
-
-

@@ -41,7 +41,6 @@
 #include "libcola/cc_clustercontainmentconstraints.h"
 #include "libcola/cc_nonoverlapconstraints.h"
 #include "libdialect/nodeconfig.h"
-
 #ifdef MAKEFEASIBLE_DEBUG
   #include "libcola/output_svg.h"
 #endif
@@ -49,9 +48,6 @@
 // Needs to come last since it will include windows.h on WIN32 and
 // may mess up C++ std library include on GCC 4.4
 #include "libcola/cola_log.h"
-
-#include "libdialect/logging.h"
-
 
 using namespace std;
 using vpsc::Dim;
@@ -66,13 +62,8 @@ using vpsc::Rectangle;
 using vpsc::Rectangles;
 
 namespace cola {
-
-    //double aspectRatio = 0.3;
     double sx ;
     double sy ;
-
-
-
 
 template <class T>
 void delete_vector(vector<T*> &v) {
@@ -125,7 +116,6 @@ ConstrainedFDLayout::ConstrainedFDLayout(const vpsc::Rectangles& rs,
       m_edge_lengths(eLengths.data(), eLengths.size()),
       m_nonoverlap_exemptions(new NonOverlapConstraintExemptions())
 {
-    //eLengths is empty
     minD = DBL_MAX;
 
     if (done == nullptr)
@@ -152,7 +142,6 @@ ConstrainedFDLayout::ConstrainedFDLayout(const vpsc::Rectangles& rs,
         D[i]=new double[n];
         G[i]=new unsigned short[n];
     }
-
 
     computePathLengths(es,m_edge_lengths);
 }
@@ -249,7 +238,6 @@ void ConstrainedFDLayout::computePathLengths(
                     "in ideal edge length array.\n", (int) i);
             eLengths[i] = 1;
         }
-        std::cout<<"elength "<< i << " : "<< eLengths[i] <<std::endl;
     }
 
     shortest_paths::johnsons(n,D,es,eLengths);
@@ -264,7 +252,6 @@ void ConstrainedFDLayout::computePathLengths(
                 // i and j are in disconnected subgraphs
                 p=0;
             } else {
-
                 d*=m_idealEdgeLength;
             }
 
@@ -313,16 +300,12 @@ void ConstrainedFDLayout::computeDescentVectorOnBothAxes(
         const bool xAxis, const bool yAxis,
         double stress, Position& x0, Position& x1) {
     setPosition(x0);
-    //z: compute the forces twice in each direction because VPSC is 1D solve for X and Y separately.
-    // this is easier to control the constraints
-
     if(xAxis) {
         applyForcesAndConstraints(vpsc::HORIZONTAL,stress);
     }
     if(yAxis) {
         applyForcesAndConstraints(vpsc::VERTICAL,stress);
     }
-
     getPosition(X,Y,x1);
 }
 
@@ -339,7 +322,7 @@ void ConstrainedFDLayout::run(const bool xAxis, const bool yAxis)
     // that vs[] contains elements equal to the number of rectangles.
     vpsc::Variables vs[2];
     vs[0].resize(n);
-    vs[1].resize(n); //VPSC variables they represent nodes with separation rules
+    vs[1].resize(n);
     generateNonOverlapAndClusterCompoundConstraints(vs);
 
     FILE_LOG(logDEBUG) << "ConstrainedFDLayout::run...";
@@ -361,7 +344,7 @@ void ConstrainedFDLayout::run(const bool xAxis, const bool yAxis)
         unsigned N=2*n;
         Position x0(N),x1(N);
         getPosition(X,Y,x0);
-        if(rungekutta) { //this is what is used
+        if(rungekutta) {
             Position a(N),b(N),c(N),d(N),ia(N),ib(N);
             computeDescentVectorOnBothAxes(xAxis,yAxis,stress,x0,a);
             ia=x0+(a-x0)/2.0;
@@ -378,37 +361,10 @@ void ConstrainedFDLayout::run(const bool xAxis, const bool yAxis)
         stress=computeStress();
         FILE_LOG(logDEBUG) << "stress="<<stress;
     } while(!(*done)(stress,X,Y));
-
-
-
-//        for (unsigned i = 0; i < n; ++i) {
-//        X[i] /= sx;
-//        Y[i] /= sy;
-//    }
-//    moveBoundingBoxes();
-//    double xmin = X[0], xmax = X[0];
-//    double ymin = Y[0], ymax = Y[0];
-//
-//    for (size_t i = 1; i < X.size(); ++i) {
-//        if (X[i] < xmin) xmin = X[i];
-//        if (X[i] > xmax) xmax = X[i];
-//        if (Y[i] < ymin) ymin = Y[i];
-//        if (Y[i] > ymax) ymax = Y[i];
-//    }
-//
-//    double adjusted_width  = (xmax - xmin) / sx;
-//    double adjusted_height = (ymax - ymin) / sy;
-//    double ar = adjusted_width / adjusted_height;
-//    printf("Adjusted AR (W/H): %.5f\n", ar);
-
-
-
-
     for(unsigned i=0;i<n;i++) {
         vpsc::Rectangle *r=boundingBoxes[i];
     FILE_LOG(logDEBUG) << *r;
     }
-
     FILE_LOG(logDEBUG) << "ConstrainedFDLayout::run done.";
 
     // Clear extra constraints.
@@ -423,6 +379,8 @@ void ConstrainedFDLayout::run(const bool xAxis, const bool yAxis)
             delete vs[dim][i];
         }
     }
+    double finalStress = stress;
+    std::cout << "Layout stress: " << finalStress << std::endl;
 }
 
 /*
@@ -1152,10 +1110,8 @@ double ConstrainedFDLayout::applyForcesAndConstraints(const vpsc::Dim dim, const
     FILE_LOG(logDEBUG) << "ConstrainedFDLayout::applyForcesAndConstraints(): dim="<<dim;
     valarray<double> g(n);
     valarray<double> &coords = (dim==vpsc::HORIZONTAL)?X:Y;
-        //valarray<double> coords( n);
-
     DesiredPositionsInDim des;
-    if(preIteration) { //Z:this gives desired positions for certain nodes if the layout asked to “keep some nodes where they are.” //this is false in hola
+    if(preIteration) {
         for(vector<Lock>::iterator l=preIteration->locks.begin();
                 l!=preIteration->locks.end();l++) {
             des.push_back(make_pair(l->getID(),l->pos(dim)));
@@ -1169,7 +1125,7 @@ double ConstrainedFDLayout::applyForcesAndConstraints(const vpsc::Dim dim, const
     setupVarsAndConstraints(n, ccs, dim, boundingBoxes,
             clusterHierarchy, vs, cs, coords);
 
-    if (topologyAddon->useTopologySolver()) //false in hola
+    if (topologyAddon->useTopologySolver())
     {
         stress = topologyAddon->applyForcesAndConstraints(this, dim, g, vs, cs,
                 coords, des, oldStress);
@@ -1178,51 +1134,18 @@ double ConstrainedFDLayout::applyForcesAndConstraints(const vpsc::Dim dim, const
         setupExtraConstraints(extraConstraints, dim, vs, cs, boundingBoxes);
         // Projection.
         SparseMap HMap(n);
-        computeForces(dim,HMap,g); //compute a descent vector.
+        computeForces(dim,HMap,g);
         SparseMatrix H(HMap);
-
-
         valarray<double> oldCoords=coords;
-        applyDescentVector(g,oldCoords,coords,oldStress,computeStepSize(H,g,g),dim,true);
-
-//        double minX = X[0], maxX = X[0], minY = Y[0], maxY = Y[0];
-//        for (int i = 1; i < n; ++i) {
-//            if (X[i] < minX) minX = X[i];
-//            if (X[i] > maxX) maxX = X[i];
-//            if (Y[i] < minY) minY = Y[i];
-//            if (Y[i] > maxY) maxY = Y[i];
-//        }
-//        double widthBefore = maxX - minX;
-//        double heightBefore = maxY - minY;
-//        double aspectBefore = widthBefore / heightBefore;
-//        std::cout << "Before VPSC projection: width=" << widthBefore
-//                  << " height=" << heightBefore
-//                  << " aspect=" << aspectBefore << std::endl;
-
+        applyDescentVector(g,oldCoords,coords,oldStress,computeStepSize(H,g,g));
         setVariableDesiredPositions(vs,cs,des,coords);
         project(vs,cs,coords);
-//        minX = maxX = X[0];
-//        minY = maxY = Y[0];
-//        for (int i = 1; i < n; ++i) {
-//            if (X[i] < minX) minX = X[i];
-//            if (X[i] > maxX) maxX = X[i];
-//            if (Y[i] < minY) minY = Y[i];
-//            if (Y[i] > maxY) maxY = Y[i];
-//        }
-//        double widthAfter = maxX - minX;
-//        double heightAfter = maxY - minY;
-//        double aspectAfter = widthAfter / heightAfter;
-//        std::cout << "After VPSC projection: width=" << widthAfter
-//                  << " height=" << heightAfter
-//                  << " aspect=" << aspectAfter << std::endl;
-
         valarray<double> d(n);
         d=oldCoords-coords;
         double stepsize=computeStepSize(H,g,d);
-
         stepsize=max(0.,min(stepsize,1.));
         //printf(" dim=%d beta: ",dim);
-        stress = applyDescentVector(d,oldCoords,coords,oldStress,stepsize,dim,false); //measuring how bad the current layout is
+        stress = applyDescentVector(d,oldCoords,coords,oldStress,stepsize);
         moveBoundingBoxes();
     }
     updateCompoundConstraints(dim, ccs);
@@ -1255,23 +1178,18 @@ double ConstrainedFDLayout::applyDescentVector(
         valarray<double> const &oldCoords,
         valarray<double> &coords,
         const double oldStress,
-        double stepsize,
-        const vpsc::Dim dim,
-        bool dIsScaled
+        double stepsize
         )
 {
     COLA_UNUSED(oldStress);
 
     COLA_ASSERT(d.size()==oldCoords.size());
     COLA_ASSERT(d.size()==coords.size());
-    double scale = (dim == vpsc::HORIZONTAL) ? sx : sy;
     while(fabs(stepsize)>0.00000000001) {
         coords=oldCoords-stepsize*d;
-
-
         double stress=computeStress();
         //printf(" applyDV: oldstress=%f, stress=%f, stepsize=%f\n", oldStress,stress,stepsize);
-        //if(oldStress>=stress) { //Z: Stress is noisy due to projection and constraints, so rejecting steps might hurt convergence. fast conversion
+        //if(oldStress>=stress) {
             return stress;
         //}
         coords=oldCoords;
@@ -1308,104 +1226,91 @@ std::vector<double> ConstrainedFDLayout::offsetDir(double minD)
  *    calculating stepsize; and
  *  - the vector g, the negative gradient (steepest-descent) direction.
  */
-
 void ConstrainedFDLayout::computeForces(
-            const vpsc::Dim dim,
-            SparseMap &H,
-            valarray<double> &g) {
-        if(n==1) return;
-        g=0;
-        // for each node:
+        const vpsc::Dim dim,
+        SparseMap &H,
+        valarray<double> &g) {
+    if(n==1) return;
+    g=0;
         if(GLOBAL_ASPECT_RATIO <= 1.0){
-             sx = 1.0 ;
-             sy =  1.0 / GLOBAL_ASPECT_RATIO;
-             //std::cout<<"sy "<<sy<<std::endl;
+            sx = 1.0 ;
+            sy =  1.0 / GLOBAL_ASPECT_RATIO;
+            //std::cout<<"sy "<<sy<<std::endl;
         } else {
             sx =  GLOBAL_ASPECT_RATIO;
             sy = 1.0 ;
         }
+    // for each node:
+    for(unsigned u=0;u<n;u++) {
+        // Stress model
+        double Huu=0;
+        for(unsigned v=0;v<n;v++) {
+            if(u==v) continue;
+            if (m_useNeighbourStress && neighbours[u][v]!=1) continue;
 
+            // The following loop randomly displaces nodes that are at identical positions
+            double rx=X[u]-X[v], ry=Y[u]-Y[v];
+//            double sd2 = rx*rx+ry*ry;
+            double ax = rx / sx; // divide to penalize one direction
+            double ay = ry / sy;
+            double sd2 = ax * ax + ay * ay ;
+            unsigned maxDisplaces = n;  // avoid infinite loop in the case of numerical issues, such as huge values
 
-//        sx = sqrt(GLOBAL_ASPECT_RATIO);
-//        sy = 1.0 / sqrt(GLOBAL_ASPECT_RATIO);
-
-
-        for(unsigned u=0;u<n;u++) {
-            // Stress model
-            double Huu=0;
-            for(unsigned v=0;v<n;v++) {
-                //compute forces between node pairs (u, v) that are either connected or have some relationship, depending on m_useNeighbourStress.
-                if(u==v) continue;
-                if (m_useNeighbourStress && neighbours[u][v]!=1) continue;
-                // The following loop randomly displaces nodes that are at identical positions
-                double rx=X[u]-X[v], ry=Y[u]-Y[v];
-//                double sd2 = rx*rx+ry*ry;
-                double ax = rx / sx; // divide to penalize one direction
-                double ay = ry / sy;
-                double sd2 = ax * ax + ay * ay ;
-
-                unsigned maxDisplaces = n;  // avoid infinite loop in the case of numerical issues, such as huge values
-                while (maxDisplaces--)
+            while (maxDisplaces--)
+            {
+                if ((sd2) > 1e-3)
                 {
-                    //If u and v are too close (sd2 ≈ 0), apply a small random displacement to node v to avoid division by zero.
-                    if ((sd2) > 1e-3)
-                    {
-                        break;
-                    }
-
-                    //Z: this is for the overlap i guess
-                    std::vector<double> rd = offsetDir(minD);
-                    X[v] += rd[0];
-                    Y[v] += rd[1];
-                    rx=X[u]-X[v], ry=Y[u]-Y[v];
-                    //sd2 = rx*rx+ry*ry;
-                    ax = rx / sx;
-                    ay = ry / sy;
-                    sd2 = ax*ax + ay*ay;
-
+                    break;
                 }
 
-                unsigned short p = G[u][v]; //the force type matrix
-                // no forces between disconnected parts of the graph
-                if(p==0) continue;
-                double l=sqrt(sd2);// Euclidean distance between u and v
-                double d=D[u][v]; // Desired (ideal) distance
-                if(l>d && p>1) continue; // skip if attractive force not needed
-                double d2=d*d;
-                /* force apart zero distances */
-                if (l < 1e-30) { // avoid zero-division
-                    l=0.1;
-                }
-//                double dx=dim==vpsc::HORIZONTAL?rx:ry;
-//                double dy=dim==vpsc::HORIZONTAL?ry:rx;
-//                g[u]+=dx*(l-d)/(d2*l);
-//                Huu-=H(u,v)=(d*dy*dy/(l*l*l)-1)/d2;
-                // Use biased delta for gradient:
-
-
-                // Gradient component (descent direction)
-                double delta = (dim == vpsc::HORIZONTAL) ? ax : ay;
-                g[u] += delta * (l - d) / (d2 * l);
-
-                // Hessian using biased deltas
-                double Huv = ((d * delta * delta) / (l * l * l) - 1) / d2;
-                H(u, v) = Huv;
-                Huu -= Huv;
-
+                std::vector<double> rd = offsetDir(minD);
+                X[v] += rd[0];
+                Y[v] += rd[1];
+                rx=X[u]-X[v], ry=Y[u]-Y[v];
+//                sd2 = rx*rx+ry*ry;
+                 ax = rx / sx; // divide to penalize one direction
+                 ay = ry / sy;
+                 sd2 = ax * ax + ay * ay ;
             }
-            H(u,u)=Huu;
-        }
-        if(desiredPositions) {
-            for(DesiredPositions::const_iterator p=desiredPositions->begin();
-                p!=desiredPositions->end();++p) {
-                unsigned i = p->id;
-                double d=(dim==vpsc::HORIZONTAL)
-                         ?p->x-X[i]:p->y-Y[i];
-                d*=p->weight;
-                g[i]-=d;
-                H(i,i)+=p->weight;
+
+            unsigned short p = G[u][v];
+            // no forces between disconnected parts of the graph
+            if(p==0) continue;
+            double l=sqrt(sd2);
+            double d=D[u][v];
+            if(l>d && p>1) continue; // attractive forces not required
+            double d2=d*d;
+            /* force apart zero distances */
+            if (l < 1e-30) {
+                l=0.1;
             }
+//            double dx=dim==vpsc::HORIZONTAL?rx:ry;
+//            double dy=dim==vpsc::HORIZONTAL?ry:rx;
+//            g[u]+=dx*(l-d)/(d2*l);
+//            Huu-=H(u,v)=(d*dy*dy/(l*l*l)-1)/d2;
+
+// Gradient component (descent direction)
+            double delta = (dim == vpsc::HORIZONTAL) ? ax : ay;
+            g[u] += delta * (l - d) / (d2 * l);
+
+            // Hessian using biased deltas
+            double Huv = ((d * delta * delta) / (l * l * l) - 1) / d2;
+            H(u, v) = Huv;
+            Huu -= Huv;
         }
+        H(u,u)=Huu;
+    }
+    if(desiredPositions) {
+        for(DesiredPositions::const_iterator p=desiredPositions->begin();
+            p!=desiredPositions->end();++p) {
+            unsigned i = p->id;
+            double d=(dim==vpsc::HORIZONTAL)
+                ?p->x-X[i]:p->y-Y[i];
+            d*=p->weight;
+            g[i]-=d;
+            H(i,i)+=p->weight;
+        }
+    }
 }
 /*
  * Returns the optimal step-size in the direction d, given gradient g and
@@ -1419,10 +1324,6 @@ double ConstrainedFDLayout::computeStepSize(
     COLA_ASSERT(g.size()==d.size());
     COLA_ASSERT(g.size()==H.rowSize());
     // stepsize = g'd / (d' H d)
-//    std::cout << "g.size(): " << g.size() << "\n";
-//    std::cout << "d.size(): " << d.size() << "\n";
-//    std::cout << "H.rowSize(): " << H.rowSize() << "\n";
-
     double numerator = dotProd(g,d);
     valarray<double> Hd(d.size());
     H.rightMultiply(d,Hd);
@@ -1438,9 +1339,6 @@ double ConstrainedFDLayout::computeStepSize(
  * This method will call preIteration if one is set.
  */
 double ConstrainedFDLayout::computeStress() const {
-    //Z: seems like  the logic is:
-        //Accept all new steps (even bad ones),
-        //but keep iterating until stress is good enough.
     FILE_LOG(logDEBUG)<<"ConstrainedFDLayout::computeStress()";
     double stress=0;
     for(unsigned u=0;(u + 1)<n;u++) {
@@ -1450,11 +1348,10 @@ double ConstrainedFDLayout::computeStress() const {
             // no forces between disconnected parts of the graph
             if(p==0) continue;
             double rx=X[u]-X[v], ry=Y[u]-Y[v];
-//            double l=sqrt((rx*rx)+ (ry*ry));
+//            double l=sqrt(rx*rx+ry*ry);
             double ax = rx / sx;
             double ay = ry / sy;
             double l = sqrt((ax*ax) + (ay*ay));
-
 
             double d=D[u][v];
             if(l>d && p>1) continue; // no attractive forces required

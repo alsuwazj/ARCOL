@@ -47,11 +47,6 @@
 #include "libdialect/util.h"
 #include "libdialect/hola.h"
 
-#include "libdialect/mytreeplacement.h"
-
-#include "libdialect/io.h"
-#include <fstream>
-
 using namespace dialect;
 
 using std::string;
@@ -61,18 +56,21 @@ void dialect::doHOLA(Graph &G) {
     doHOLA(G, opts);
 }
 
-//z
-void saveGraphSvg(const Graph &G, const std::string &prefix, unsigned step) {
-    std::string stepStr = (step < 10 ? "0" : "") + std::to_string(step);
+void dialect::printAspectRatio(Graph &G,  const std::string& label ) {
 
-    // Generate SVG filename
-    std::string svgFile = prefix + "_" + stepStr + ".svg";
+    BoundingBox bbox = G.getBoundingBox();
+    double width = bbox.w();
+    double height = bbox.h();
 
-    // Write graph to SVG format
-    std::string svgOutput = G.writeSvg();
-    writeStringToFile(svgOutput, svgFile);
-
-    std::cout << "Saved step " << step << ": " << svgFile << std::endl;
+    if (height != 0.0) {
+        double aspectRatio = width / height;
+        std::cout << (label.empty() ? "" : label + ": ")
+                  << "Aspect Ratio: " << aspectRatio
+                  << " (W: " << width << ", H: " << height << ")" << std::endl;
+    } else {
+        std::cerr << (label.empty() ? "" : label + ": ")
+                  << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
+    }
 }
 
 void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
@@ -90,25 +88,17 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     // Initialise a logging index.
     unsigned ln = 0;
 
-
-
-
     // We let the given graph auto-infer its own ideal edge length, based on node sizes.
-    double IEL = G.getIEL(); //2 * AvgNodeDim
+    double IEL = G.getIEL();
     // Pad nodes
     double nodePadding = holaOpts.nodePaddingScalar*IEL;
-    G.padAllNodes(nodePadding, nodePadding); // add the padding to the width and height of the nodes
-    // We need to dismantle (disassemble) the graph, so we begin by making a copy and we work on that instead.
+    G.padAllNodes(nodePadding, nodePadding);
+    // We need to dismantle the graph, so we begin by making a copy and we work on that instead.
     // We allocate this copy on the heap, and manage it with a shared ptr, since many of our tools
-    // require that. // dynamic memory allocation at runtime
+    // require that.
     Graph_SP Gcopy = std::make_shared<Graph>(G);
-
-
-
-    //z
-    saveGraphSvg(*Gcopy, "hola_step", 0);
     // Clear any existing connector routes, for better logging output.
-    Gcopy->clearAllRoutes();  // we do not have that in the input i guess
+    Gcopy->clearAllRoutes();
 
     // Peel.
     Trees trees = peel(*Gcopy);
@@ -117,8 +107,6 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     Graph_SP &core = Gcopy;
 
     log(*core, string_format("%02d_core", ln++));
-
-
 
     // If it's just a tree, layout and quit.
     // We recognise this case by there being exactly one tree, containing the same number of
@@ -147,288 +135,47 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         tree->addConstraints(G, true);
         // Done.
         return;
-    } //Z: I should study that
+    }
 
     // Otherwise we do have a core and trees.
 
-    //Z
-    //first, compute the symmetric layout of each tree
-    unsigned lns = 0;  // initialise logging sub-index
-    for (Tree_SP tree : trees) {
-        tree->symmetricLayout(
-                holaOpts.defaultTreeGrowthDir,
-                holaOpts.treeLayoutScalar_nodeSep*IEL,
-                holaOpts.treeLayoutScalar_rankSep*IEL,
-                holaOpts.preferConvexTrees
-        );
-        log(*(tree->underlyingGraph()), string_format("%02d_%02d_symm_tree", ln, lns++));
-    }
-
-        // Step 2: Process each tree
-    std::map<Tree_SP, Node_SP> tree2box; //Each Tree_SP has a corresponding bounding box node
-    for (Tree_SP tree : trees) {
-        id_type rootID = tree->getRootNode()->id();
-        Node_SP coreRoot;
-        try {
-            coreRoot = core->getNode(rootID);  // use the root node inside the core
-        } catch (const std::out_of_range&) {
-            std::cerr << "Error: Root node ID " << rootID << " not found in core graph!\n";
-            continue;  // skip this tree
-        }
-
-        // Step 3: Compute bounding box for tree (excluding root)
-        Node_SP bboxNode = tree->buildRootlessBox(holaOpts.defaultTreeGrowthDir);
-        if (!bboxNode) {
-            std::cerr << "Error: Could not compute bounding box for tree rooted at " << rootID << "!\n";
-            continue;
-        }
-
-        // Step 4: Add bounding box node to the core graph
-        core->addNode(bboxNode);
-
-        // Step 5: Connect bounding box node to the root node in core
-        Edge_SP bboxEdge = Edge::allocate(bboxNode, coreRoot);
-        core->addEdge(bboxEdge);
-
-        // Save mapping for later
-        tree2box[tree] = bboxNode;
-
-        // Step 6: Log progress
-        log(*core, string_format("%02d_%02d_add_tree_bounding_box", ln, lns++));
-    }
-
-    // Start with a plain destress (de-stress)-- no constraints, no overlap prevention -- in order to begin
+    // Start with a plain destress -- no constraints, no overlap prevention -- in order to begin
     // giving the nodes a reasonable distribution in the plane.
+    core->destress();
 
-    ColaOptions colaOpts;
-// === Step 1: Estimate base spacing factor ===
-// You can make this dynamic using graph density or max degree
-//    double aspectRatio =2.5;
-//    double spacingFactor = 1.2; // tweakable (e.g., 1.0–1.5)
-//    // Let the spacing factor vary smoothly based on how far we are from 1.0 (square)
-//    //Smooth Sigmoid-like Scaling
-//    double smoothFactor = 1.0 + 0.2 * ((aspectRatio - 1.0) / (aspectRatio + 1.0));  // ∈ [~0.8, ~1.2]
-//    spacingFactor *= smoothFactor;
-//
-//
-//// === Step 2: Compute Ideal Edge Length (IEL) ===
-//// Use average node size and spacing factor to derive IEL
-//    double avgNodeSize = Gcopy->computeAvgNodeDim(); // avg of width and height
-//
-////    double totalNodeArea = 0.0;
-////    for (auto& rect : Gcopy->boundingBoxes) {
-////        double nodeArea = rect->width() * rect->height();
-////        totalNodeArea += nodeArea;
-////    }
-//    //IEL = avgNodeSize * spacingFactor;        // base spacing between nodes
-//
-//// === Step 3: Derive per-node area from IEL ===
-//// This assumes nodes are roughly IEL apart, forming a grid-like layout
-////since IEL is now including the AVGnodesize we can use that
-//    double areaPerNode = IEL * IEL;  //avgNodeSize * avgNodeSize * spacingFactor;
-//
-//
-//// === Step 4: Estimate total layout area needed ===
-//    int numNodes = core->getNumNodes();
-//    double layoutArea = areaPerNode *numNodes;
-//
-//// === Step 5: Choose aspect ratio (w/h) and compute layout dimensions ===
-//// Example: 0.33 = tall; 2.5 = wide
-//
-//    double height = sqrt(layoutArea / aspectRatio)  +40;
-//    double width  = aspectRatio * height  +40;
-//
-//   // double safetyMargin = 0.2;  // 10% extra room
-//    *sharedWidth  = width  ;//* (1.0 + safetyMargin);
-//    *sharedHeight = height ;//* (1.0 + safetyMargin);
-//
-//// === Step 7: Save to ColaOptions for layout and constraints ===
-//    colaOpts.newHeight = sharedHeight;
-//    colaOpts.newWidth  = sharedWidth;
-//    colaOpts.idealEdgeLength = IEL;
-
-// === Step 8: Register IEL in the graph copy ===
-    //Gcopy->setIEL(IEL);
-
-    //skeleton force
-    // Parameters
-    int num_ghost_per_axis = 10;
-    double aspectRatio = 2.0; // e.g., wider than tall
-    //double IEL = G.getIEL();
-    double width = sqrt(core->getNumNodes() * IEL * IEL * aspectRatio);
-    double height = width / aspectRatio;
-    double centerX = width / 2.0;
-    double centerY = height / 2.0;
-
-// Add ghost nodes in a cross shape
-    std::vector<Node_SP> ghostNodes;
-
-// Horizontal (x-axis)
-    for (int i = 0; i < num_ghost_per_axis; ++i) {
-        double x = i * (width / (num_ghost_per_axis - 1));
-        ghostNodes.push_back(core->addNode(x, centerY, 0.01, 0.01));  // small node
-    }
-
-// Vertical (y-axis)
-    for (int i = 0; i < num_ghost_per_axis; ++i) {
-        double y = i * (height / (num_ghost_per_axis - 1));
-        ghostNodes.push_back(core->addNode(centerX, y, 0.01, 0.01));  // small node
-    }
-//add edges
-    for (const auto& kv : core->getNodeLookup()) {
-        Node_SP realNode = kv.second;
-        if (realNode->getBoundingBox().w() > 0.05) {  // skip ghost nodes
-            // Find nearest ghost node
-            Node_SP nearest = nullptr;
-            double bestDist = DBL_MAX;
-            for (Node_SP ghost : ghostNodes) {
-                double dx = ghost->getCentre().x - realNode->getCentre().x;
-                double dy = ghost->getCentre().y - realNode->getCentre().y;
-                double d2 = dx*dx + dy*dy;
-                if (d2 < bestDist) {
-                    bestDist = d2;
-                    nearest = ghost;
-                }
-            }
-            // Add edge with small weight (in IEL vector later)
-            Edge_SP e = core->addEdge(realNode, nearest);
-            // Store somewhere you can mark this edge as "light" if needed
-        }
-    }
-    const auto& edges = core->getEdgeLookup();
-
-    for (const auto& [eid, edge] : edges)  {
-        auto dims1 = edge->getSourceEnd()->getDimensions();
-        auto dims2 = edge->getTargetEnd()->getDimensions();
-
-        bool isGhost = (dims1.first < 0.05 && dims1.second < 0.05)
-                       || (dims2.first < 0.05 && dims2.second < 0.05);
-        colaOpts.eLengths.push_back(isGhost ? 0.5 : 1.0);
-    }
-
-    core->destress(colaOpts); //first round of FD layout
     log(*core, string_format("%02d_free_destress_core", ln++));
+    printAspectRatio(*core, "free_destress_core");
 
-    BoundingBox bbox = core->getBoundingBox();
-    double width1 = bbox.w();
-    double height1 = bbox.h();
-
-    if (height1 != 0.0) {
-        double aspectRatio1 = width1 / height1;
-        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
-    } else {
-        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
-    }
-
-    //z:
-
-    //colaOpts.preventOverlaps = true;
-
-// Shared aspect ratio
-//    double aspectRatio = *sharedWidth / *sharedHeight;
-//
-//// Compute the current layout's area
-//    BoundingBox bboxOrig = core->getBoundingBox();
-//    double OrigArea = bboxOrig.w() * bboxOrig.h();
-//
-//// Compute new height and width for the bounding box with the same area and desired aspect ratio
-//    *sharedHeight = sqrt(OrigArea / aspectRatio);
-//    *sharedWidth = aspectRatio * *sharedHeight;
-//
-//// Assign to ColaOptions
-//    colaOpts.newHeight = sharedHeight;
-//    colaOpts.newWidth = sharedWidth;
-//
-//    std::cout << "old H: " << bboxOrig.h() << " new H: " << *colaOpts.newHeight << std::endl;
-//    std::cout << "old w: " << bboxOrig.w() << " new w: " << *colaOpts.newWidth << std::endl;
-//
-//// Apply layout
-//    core->destress();
-//    log(*core, string_format("%02d_free2_destress_core", ln++));
-
-
-
-
-
-
-    //Z
-//    colaOpts.aspectRatioCons =true;
-//    double aspectRatio = 2.0/2.0;
-//    //compute the bbox of the current layout
-//    BoundingBox bboxOrig = core->getBoundingBox();
-//    //compute the area of the bboxOrig
-//    double OrigArea = bboxOrig.w() * bboxOrig.h();
-//    //compute new h and w for the new bounding box that has same area and desired aspect ratio
-//    colaOpts.newHeight = sqrt(OrigArea / aspectRatio);
-//    colaOpts.newWidth = aspectRatio * colaOpts.newHeight;
-//    std::cout << "old H: "<< bboxOrig.h() << "new H: "<< colaOpts.newHeight <<std::endl;
-//    std::cout << "old w: "<< bboxOrig.w() << "new w: "<< colaOpts.newWidth <<std::endl;
-
-    colaOpts.preventOverlaps = true;
-    std::cout <<"non overlap is added now" << std::endl;
     // Now destress again, this time removing any node overlaps.
-    core->destress(colaOpts); //second round of FD layout
-    //colaOpts.aspectRatioCons =false;
-    //std::cout <<core->getBoundingBox().w() << "  "<< core->getBoundingBox().h()<<std::endl;
+    ColaOptions colaOpts;
+    colaOpts.preventOverlaps = true;
+    core->destress(colaOpts);
+
     log(*core, string_format("%02d_OP_destress_core", ln++));
-
-     bbox = core->getBoundingBox();
-     width1 = bbox.w();
-     height1 = bbox.h();
-
-    if (height1 != 0.0) {
-        double aspectRatio1 = width1 / height1;
-        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
-    } else {
-        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
-    }
-
+    printAspectRatio(*core, "OP_destress_core");
     // Layout the hubs.
-    nli(ln); // this for the logger
-    OrthoHubLayoutOptions ohlOpts; // this could be hardest part, Because it's working very locally Just looking at one node at a time
-    ohlOpts.avoidFlatTriangles = holaOpts.orthoHubAvoidFlatTriangles; // it is true initially
+    nli(ln);
+    OrthoHubLayoutOptions ohlOpts;
+    ohlOpts.avoidFlatTriangles = holaOpts.orthoHubAvoidFlatTriangles;
     OrthoHubLayout ohl(core, ohlOpts);
     ohl.layout(logger);
 
     log(*core, string_format("%02d_core_ortho_hub", ln++));
-
-    bbox = core->getBoundingBox();
-    width1 = bbox.w();
-    height1 = bbox.h();
-
-    if (height1 != 0.0) {
-        double aspectRatio1 = width1 / height1;
-        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
-    } else {
-        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
-    }
-
+    printAspectRatio(*core, "core_ortho_hub");
     // Set extra gap for boundary constraints.
-    core->getSepMatrix().setExtraBdryGap(IEL/2.0); // spacing between nodes
+    core->getSepMatrix().setExtraBdryGap(IEL/2.0);
 
-    // Dissipate (remove) any stress accumulated during ortho hub layout, aiming to regain a natrual
+    // Dissipate any stress accumulated during ortho hub layout, aiming to regain a natrual
     // distribution for the nodes that remain unconstrained, and perhaps regain natural symmetries.
     // This time, besides just preventing overlaps between nodes, we also prevent any nodes from
     // overlapping with aligned edges.
     colaOpts.solidifyAlignedEdges = true;
     colaOpts.logger = logger;
     nli(ln);
-    colaOpts.idealEdgeLength =IEL;
-    core->destress(colaOpts); // another FD layout for minimizing the stress after orthogonalizing with extar gap //here the chains will be smoothed
+    core->destress(colaOpts);
 
     log(*core, string_format("%02d_EOP_destress_core", ln++));
-
-    bbox = core->getBoundingBox();
-    width1 = bbox.w();
-    height1 = bbox.h();
-
-    if (height1 != 0.0) {
-        double aspectRatio1 = width1 / height1;
-        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
-    } else {
-        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
-    }
-
+    printAspectRatio(*core, "EOP_destress_core");
     // Next we lay out the links.
     // We may or may not build Chains for this process. Later we will need to know whether chains
     // were built, so the vector of Chains is declared at this scope.
@@ -445,7 +192,7 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     } else {
         // Use shape-conforming chain layout.
         chains = buildAllChainsInGraph(core);
-        for (Chain_SP chain : chains) chain->takeShapeBasedConfiguration(); // this one,  where we ask we grab the graphs get sepMatrix.
+        for (Chain_SP chain : chains) chain->takeShapeBasedConfiguration();
         // We project before destressing with edge-node overlap prevention, so that the edges of
         // the chain can be axis aligned first.
         // We do NOT want overlap prevention for the projection, because the new chain configuration
@@ -467,51 +214,34 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     double preRoutingGapIELScalar = 0.125;
     double preRoutingGap = preRoutingGapIELScalar*IEL;
     core->padAllNodes(preRoutingGap, preRoutingGap);
-
     core->destress(colaOpts);
     core->padAllNodes(-preRoutingGap, -preRoutingGap);
     if (holaOpts.useACAforLinks) {
         log(*core, string_format("%02d_core_link_config_ACA", ln++));
+        printAspectRatio(*core, "core_link_config_ACA");
     } else {
         log(*core, string_format("%02d_core_link_config_Chains", ln++));
     }
 
-    bbox = core->getBoundingBox();
-    width1 = bbox.w();
-    height1 = bbox.h();
-
-    if (height1 != 0.0) {
-        double aspectRatio1 = width1 / height1;
-        std::cout << "Aspect Ratio: " << aspectRatio1 << " (W: " << width1 << ", H: " << height1 << ")" << std::endl;
-    } else {
-        std::cerr << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
-    }
-
-    //z
-    //saveGraphSvg(*core, "hola_step", ln);
     // Next is the phase in which we planarise the core.
     // However, we want a 4-planar orthogonal layout with no leaves for this phase, so we first
     // perform a special orthogonal connector routing, which ensures that no nodes will become
     // leaves in the planarisation. (It does this by ensuring that connectors are routed to at
     // least two distinct sides of each node.)
-    //std::cout << "num nodes "<< core->getNumNodes()<<std::endl;
-    LeaflessOrthoRouter lor(core, holaOpts); //Z not clear
+    LeaflessOrthoRouter lor(core, holaOpts);
     nli(ln);
     lor.route(logger);
     ++ln;
 
-    //std::cout <<core->getBoundingBox().w() << "  "<< core->getBoundingBox().h()<<std::endl;
     log(*core, string_format("%02d_core_leafless_ortho_route", ln++));
-
+    printAspectRatio(*core, "core_leafless_ortho_route");
     OrthoPlanariser op(core);
     Graph_SP P = op.planarise();
 
     log(*P, string_format("%02d_planar_graph_P", ln++));
-
+    printAspectRatio(*core, "planar_graph_P");
     // Set extra gap for boundary constraints.
-    P->getSepMatrix().setExtraBdryGap(IEL/2.0); //Z: edge to edge boundary between nodes not between centers
-    log(*P, string_format("%02d_planar_graph_Extra_space_P", ln++));
-
+    P->getSepMatrix().setExtraBdryGap(IEL/2.0);
     // Destress the new planar graph P, aiming to regain possible natural symmetries.
     // But use overlap prevention so that the structure cannot change.
     // (Note that now /all/ edges are aligned, so we have total edge-node overlap prevention.)
@@ -521,12 +251,11 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     P->destress(colaOpts);
 
     log(*P, string_format("%02d_P_EOP_destress", ln++));
-
-/*
+    printAspectRatio(*core, "P_EOP_destress");
     // Now we want to reattach the trees, choosing faces of the planarised core in which to
     // place them.
     // First the trees need their own symmetric layout.
-    //unsigned lns = 0;  // initialise logging sub-index
+    unsigned lns = 0;  // initialise logging sub-index
     for (Tree_SP tree : trees) {
         tree->symmetricLayout(
             holaOpts.defaultTreeGrowthDir,
@@ -537,105 +266,38 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         log(*(tree->underlyingGraph()), string_format("%02d_%02d_symm_tree", ln, lns++));
     }
 
-    //Z: here I should do the bounding boxes for the phases and feed it to the FD layout
-
     ++ln;
     nli(ln);
     // Now we can choose faces and reattach them.
-    //Z: different ways we can reattach trees or different ways we can orient the trees. this could have a pretty big impact on the final aspect ratio.
     FaceSet_SP faceSet = reattachTrees(P, trees, holaOpts, logger);
     ++ln;
     // We will need the vector of chosen tree placements.
     TreePlacements tps = faceSet->getAllTreePlacements();
-    log(*P, string_format("%02d_with_Boxes", ++ln));
-    //z
-    colaOpts.preventOverlaps = true;
-    colaOpts.solidifyAlignedEdges = true;
-    nli(ln);
-    P->destress(colaOpts);
-    log(*P, string_format("%02d_with_Boxes_after_FD", ++ln));
 
-    */
-/*   Z: here I should do something to add the actual trees
- *
     // Next we insert the actual trees back into the planar graph.
     // The trees come with buffer nodes. We build a record of those, so they can be
     // ignored where necessary.
-    */
-
-    // === Manually re-insert actual trees at bounding box positions ===
     NodesById bufferNodes;
     EdgesById treeEdges;
-    TreePlacements tps;
-
-// Reuse the bounding boxes you created earlier (tree2box)
-    for (auto &pair : tree2box) {
-        Tree_SP tree = pair.first;
-        Node_SP boxNode = pair.second;
-
-        std::cout << "Creating placement for tree ID: "
-                  << (tree ? tree->getRootNodeID() : -1) << std::endl;
-
-        if (!tree || !boxNode) {
-            std::cerr << "Error: Null tree or boxNode encountered.\n";
-            continue;
-        }
-
-        try {
-            TreePlacement_SP tp = std::make_shared<MyTreePlacement>(tree, boxNode);
-            std::cout << "Calling applyGeometryToTree..." << std::endl;
-            tp->applyGeometryToTree();
-            tps.push_back(tp);
-        } catch (const std::exception& e) {
-            std::cerr << "Caught exception during placement: " << e.what() << std::endl;
-        } catch (...) {
-            std::cerr << "Unknown error during placement for tree ID: " << tree->getRootNodeID() << std::endl;
-        }
-    }
-
-
-
     std::vector<NodesById> clustersSansBufferNodes;
     for (auto tp : tps) {
-        tp->applyGeometryToTree();  // sets internal positions
-
+        tp->applyGeometryToTree();
         NodesById treeNodes;
         NodesById buffNodes;
         tp->insertTreeIntoGraph(*P, treeNodes, buffNodes, treeEdges);
-
         clustersSansBufferNodes.push_back(treeNodes);
-
-        // Combine and store clusters
         treeNodes.insert(buffNodes.begin(), buffNodes.end());
         bufferNodes.insert(buffNodes.begin(), buffNodes.end());
         colaOpts.nodeClusters.push_back(treeNodes);
     }
 
-    //z:
-    // Remove bounding box nodes and connecting edges
-
-    for (const auto& [tree, boxNode] : tree2box) {
-        for (const auto& [edgeId, edge] : boxNode->getEdgeLookup()) {
-            P->severEdge(*edge);
-        }
-        P->removeNode(*boxNode);
-    }
-
-
-
-
-    colaOpts.preventOverlaps = true;
-    colaOpts.solidifyAlignedEdges = true;
-    nli(ln);
-    P->destress(colaOpts);
     log(*P, string_format("%02d_P_with_trees", ln++));
-
+    printAspectRatio(*core, "P_with_trees");
     // We don't need solid edges within the trees; moreover, this would cause constraint
     // conflicts since the tree nodes now belong to clusters to which their solid edges
     // would not belong.
     colaOpts.solidEdgeExemptions = treeEdges;
     // Destress using neighbour stress, in order to compactify.
-
     colaOpts.useNeighbourStress = true;
     // Now that we are using clusters to keep the tree nodes together, we make sure
     // we do not use majorization, since ConstrainedMajorizationLayout does not work
@@ -646,8 +308,7 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     P->destress(colaOpts);
 
     log(*P, string_format("%02d_P_nbr_destress", ln++));
-
-/*
+    printAspectRatio(*core, "P_nbr_destress");
     // Do near alignments.
     if (holaOpts.do_near_align) {
         AlignmentTable atab(*P, bufferNodes);
@@ -659,18 +320,16 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
             P->destress(colaOpts);
             log(*P, string_format("%02d_P_near_alignments", ln++));
         }
+        printAspectRatio(*core, "P_near_alignments");
     }
 
     // Delete buffer nodes.
     P->removeNodes(bufferNodes);
     colaOpts.nodeClusters = clustersSansBufferNodes;
-    log(*P, string_format("%02d_without_buffer_nodes", ln++));
-
 
     // Rotate if desired.
-    // Z no rotation
+    //Z: no rotation
     if (false && holaOpts.preferredAspectRatio != AspectRatioClass::NONE) {
-        std::cout <<"rotete !!"<<std::endl;
         BoundingBox b = P->getBoundingBox(bufferNodes);
         double w = b.w(),
                h = b.h();
@@ -721,9 +380,10 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         if (quarterTurnsCW != 0) {
             for (Tree_SP tree : trees) tree->rotateGrowthDirCW(quarterTurnsCW);
         }
+        log(*P, string_format("%02d_P_rotation", ln++));
+        printAspectRatio(*core, "P_rotation");
     }
 
-    log(*P, string_format("%02d_P_rotation", ln++));
 
     // Translate if desired.
     if (holaOpts.putUlcAtOrigin) {
@@ -733,9 +393,11 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         double dx = -b.x,
                dy = -b.y;
         P->translate(dx, dy);
+
+        log(*P, string_format("%02d_P_translation", ln++));
+        printAspectRatio(*core, "P_translation");
     }
-*/
-    log(*P, string_format("%02d_P_translation", ln++));
+
 
     // At this point, we can ask the planar graph P to set node positions in the original graph G.
     // This is because it is now true that for every node u in G, there is a node v in P with v.ID == u.ID.
@@ -751,8 +413,6 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     // Set extra gap for boundary constraints.
     G.getSepMatrix().setExtraBdryGap(IEL/2.0);
 
-    log(*P, string_format("%02d_before_clearing", ln++));
-
     // Final connector routing.
     G.clearAllRoutes();
 
@@ -767,9 +427,6 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         for (Chain_SP ch : chains) ch->addAestheticBendsToEdges();
         G.buildRoutes();
     }
-
-    log(*P, string_format("%02d_final_1", ln++));
-
     // Set up a routing adapter.
     RoutingAdapter ra(Avoid::OrthogonalRouting);
     ra.router.setRoutingOption(Avoid::nudgeOrthogonalSegmentsConnectedToShapes, true);
@@ -787,8 +444,6 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     core->padAllNodes(-nodePaddingLayer1, -nodePaddingLayer1);
     
     core->addBendlessSubnetworkToRoutingAdapter(ra);
-    log(G, string_format("%02d_final_2", ln++));
-
     // Ask each Tree to add its network to the router.
     for (Tree_SP tree : trees) {
         tree->underlyingGraph()->padAllNodes(-nodePaddingLayer1, -nodePaddingLayer1);
@@ -802,10 +457,7 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     for (Tree_SP tree : trees) {
         tree->underlyingGraph()->setRoutesInCorrespEdges(G);
     }
-    log(G, string_format("%02d_final_3", ln++));
 
     // Remove remaining node padding.
     G.padAllNodes(-nodePaddingLayer2, -nodePaddingLayer2);
-
-
 }

@@ -197,7 +197,6 @@ LeaflessOrthoRouter::LeaflessOrthoRouter(Graph_SP G, const HolaOpts &opts)
       m_ra(Avoid::OrthogonalRouting),
       m_iel(G->getIEL())
 {
-    //std::cout <<"routing.cpp/  m_n(G->getNumNodes()), "<< m_n <<std::endl;
     // Set up the router.
     m_ra.router.setRoutingOption(Avoid::nudgeSharedPathsWithCommonEndPoint, false);
     m_ra.router.setRoutingParameter(Avoid::crossingPenalty, opts.routingScalar_crossingPenalty*m_iel);
@@ -304,13 +303,8 @@ void LeaflessOrthoRouter::route(Logger *logger) {
             Node_SP &u = p.second;
             const EdgesById edgeLookup = u->getEdgeLookup();
             // Sanity check, that Node u is not an actual leaf:
-            //COLA_ASSERT(edgeLookup.size() > 1);
-            if (edgeLookup.size() <= 1) {
-                continue;  // Skip processing for leaf nodes
-            }
+            COLA_ASSERT(edgeLookup.size() > 1);
             // Determine the departure direction from Node u for its first Edge.
-            //std::cout << "routing.cpp/ after commenting out "<<std::endl;
-
             auto edge_it = edgeLookup.cbegin();
             CardinalDir d0 = departureDir((*edge_it).second, u);
             // If two or more directions have been used, some edge must depart
@@ -329,12 +323,10 @@ void LeaflessOrthoRouter::route(Logger *logger) {
             }
         }
         // Are there any pseudoleaves?
-        //std::cout << "routing.cpp/ Are there any pseudoleaves? "<<std::endl;
         if (pseudoLeaves.empty()) {
             // If there are none, then we're done routing, and can break out of the outer loop.
             break;
         } else {
-            //std::cout << "routing.cpp/ !pseudoLeaves.empty() "<<std::endl;
             for (size_t i = 0; i < pseudoLeaves.size(); ++i) {
                 Node_SP u = pseudoLeaves[i];
                 CardinalDir d0 = soleDepartureDirecs[i];
@@ -360,8 +352,6 @@ void LeaflessOrthoRouter::route(Logger *logger) {
                     // If this is different from direction d0, then we're happy to accept this candidate.
                     if (d1 != d0) break;
                 }
-                //std::cout << "routing.cpp/ finish else "<<std::endl;
-
                 // Start with the directions allowed last time:
                 ConnDirFlags available = m_allowedConnDirs.at(candidate->id()).at(u->id());
                 // XOR with the connection flag corresponding to cardinal direction d0,

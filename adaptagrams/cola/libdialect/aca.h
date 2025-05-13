@@ -472,8 +472,6 @@ private:
     std::set<unsigned> exemptionSetForEdge(int j);
     OrderedAlignment *chooseOA(void);
     bool createsOverlap(OrderedAlignment *oa);
-    //z
-    bool isNodeWithinPage(Node_SP node, double left, double right, double top, double bottom) const;
     bool allOrNothing(OrderedAlignments oas);
     bool applyIfFeasible(OrderedAlignment *oa);
     vpsc::IncSolver *satisfy(vpsc::Variables &vs, vpsc::Constraints &cs, bool &sat);

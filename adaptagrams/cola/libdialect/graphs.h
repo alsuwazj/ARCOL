@@ -47,8 +47,6 @@
 #include "libdialect/logging.h"
 
 namespace dialect {
-    extern std::shared_ptr<double> sharedWidth;
-    extern std::shared_ptr<double> sharedHeight;
 
 //! @brief  A bounding box, given by the extreme coordinates.
 struct BoundingBox {
@@ -100,21 +98,11 @@ struct BoundingBox {
     double X;
     double y;
     double Y;
-
-
 };
 
 //! @brief  Provides a simple way to set any or all of the various
 //!         optional arguments to libcola layout methods.
 struct ColaOptions {
-
-    bool aspectRatioCons = true;
-    std::shared_ptr<double> newWidth  ;
-    std::shared_ptr<double> newHeight ; //had to put it 1 as we want to assert it is < xLow
-    ColaOptions() {
-        newWidth = dialect::sharedWidth;
-        newHeight = dialect::sharedHeight;
-    }
     //! Leave the ideal edge length set to zero if you want the Graph to
     //! automatically substitute its own ideal edge length.
     double idealEdgeLength = 0;
@@ -130,14 +118,14 @@ struct ColaOptions {
     //! Work in the y-dimension?
     bool yAxis = true;
     //! When using a ConstrainedFDLayout, do makeFeasible before running?
-    bool makeFeasible = true;
+    bool makeFeasible = false;
     //! The CFDL makeFeasible operation allows you to set extra border thickness
     //! on rectangles in the x- and y-dimensions. You can set those values here.
     double makeFeasible_xBorder = 0;
     double makeFeasible_yBorder = 0;
     //! Use neighbour stress? If true this means that only those stress terms
     //! will be counted for pairs of nodes connected by an edge.
-    bool useNeighbourStress = false; //Z: true if you want to destress to compactify
+    bool useNeighbourStress = false;
     //! Ordinarily we use neighbour stress in an attempt to make the layout more
     //! compact. In order to encourage this, we usually scale the IEL by a small
     //! fraction as well. The scalar can be set here.
@@ -146,7 +134,7 @@ struct ColaOptions {
     //! if you want to use a ConstrainedMajorizationLayout, set it true.
     bool useMajorization = false;
     //! If using a ConstrainedMajorizationLayout, say whether you want scaling.
-    bool useScaling = true;
+    bool useScaling = false;
     //! Any /additional/ constraints in the form of cola::CompoundConstraints
     //! may be set here. Note that these are added to the constraints already
     //! recorded in the graph's SepMatrix.
@@ -191,8 +179,6 @@ struct NodeIdCmp {
 //!
 class Graph {
 public:
-
-
     //! @brief  Default constructor.
     Graph(void) : m_sepMatrix(this) {}
 
@@ -393,8 +379,6 @@ public:
     //!
     //! @sa Graph::recomputeIEL
     double getIEL(void);
-
-    void setIEL(double iel);
 
     //! @brief  Recompute, store, and return the Graph's ideal edge length.
     //!

@@ -42,7 +42,7 @@ using namespace dialect;
 using Avoid::Point;
 
 using std::string;
-
+double GLOBAL_ASPECT_RATIO = 1.0;
 OrthoHubLayout::OrthoHubLayout(Graph_SP G, OrthoHubLayoutOptions opts)
     : m_graph(G),
       m_opts(opts),
@@ -66,7 +66,7 @@ OrthoHubLayout::OrthoHubLayout(Graph_SP G, OrthoHubLayoutOptions opts)
     std::stable_sort(m_hubs.begin(), m_hubs.end(),
         [](const Node_SP &a, const Node_SP &b) -> bool {return a->getDegree() > b->getDegree();}
     );
-    // Make lookup for edge indices by their endpt indices. // Z: to make it faster
+    // Make lookup for edge indices by their endpt indices.
     for (size_t j = 0; j < m_cgr.es.size(); ++j) {
         auto e = m_cgr.es[j];
         m_edgeLookup(e.first, e.second) = j;
@@ -82,22 +82,8 @@ OrthoHubLayout::OrthoHubLayout(Graph_SP G, OrthoHubLayoutOptions opts)
             m_adjMat[id2][id1] = 1;
         }
     }
-    //add page boundary const here
-//    cola::PageBoundaryConstraints pageConstraint(0, 300, 0, 900, 5000);; //0.21666
-//    for (auto &p: m_nodes) {
-//        Node_SP u = p.second;
-//        auto dimensions = u->getDimensions();
-//        double nodeWidth = dimensions.first;
-//        double nodeHeight = dimensions.second;
-//        pageConstraint.addShape(m_cgr.id2ix.at(u->id()), nodeWidth / 2, nodeHeight / 2);
-//    }
-//
-//    // Apply constraint inside opts2
-//    m_colaOpts.ccs.push_back(&pageConstraint);
-
     // When we destress, we want overlap prevention.
     m_colaOpts.preventOverlaps = true;
-
 }
 
 bool OrthoHubLayout::makesFlatTriangle(const Assignment_SP &asgn) {
@@ -161,7 +147,7 @@ void OrthoHubLayout::layout(Logger *logger) {
         // First make sure the Node objects have the most up-to-date positions.
         // This is so that the costs of the assignments are correctly evaluated.
         m_graph->updateNodesFromRects();
-        Assignments v = getAssignmentsForNode(hub); //Z: Modifying this function logic is risky and difficult.
+        Assignments v = getAssignmentsForNode(hub);
         // We need to turn the vector into a deque.
         std::deque<Assignment_SP> asgns;
         asgns.resize(v.size());
@@ -179,24 +165,6 @@ void OrthoHubLayout::layout(Logger *logger) {
             ++hub_ptr;
             continue;
         }
-        //z: print the assignments
-//        std::cout << "Assignments for hub node ID: " << hub->id() << "\n";
-//
-//        int index = 0;
-//        for (const Assignment_SP& asgn : asgns) {
-//            std::cout << "Assignment #" << index++ << ":\n";
-//            const char* dirs[4] = {"WEST", "EAST", "SOUTH", "NORTH"};
-//            for (int i = 0; i < 4; ++i) {
-//                if (asgn->semis[i]) {
-//                    std::cout << "  " << dirs[i] << " → Nbr ID: " << asgn->semis[i]->id
-//                              << "  (dx: " << asgn->semis[i]->x
-//                              << ", dy: " << asgn->semis[i]->y << ")\n";
-//                } else {
-//                    std::cout << "  " << dirs[i] << " → nullptr\n";
-//                }
-//            }
-//            std::cout << std::endl;
-//        }
         // Otherwise, begin attempting the Assignments.
         // Quit either when one works, or when we run out.
         bool success = false;
@@ -236,13 +204,10 @@ void OrthoHubLayout::layout(Logger *logger) {
                 size_t edge_ix = m_edgeLookup(hub_ix, nbr_ix);
                 OrderedAlignment *oa = m_aca.initOrdAlign(hub_ix, nbr_ix, sepFlags[i], edge_ix);
                 oas.push_back(oa);
-
             }
             // Attempt to apply the constraints.
             success = m_aca.applyOAsAllOrNothing(oas);
-            //std::cout <<"Hub: " << hub->id() << " success "<< success <<std::endl;
             if (success) break;
-
         }
         // Now we have either found an assignment that works, or tried them all and none of them worked.
         if (success) {
@@ -255,7 +220,6 @@ void OrthoHubLayout::layout(Logger *logger) {
             // If we were not able to configure this hub, it may be that relieving
             // stress in the graph will permit us to configure it. So destress and try this one again.
             // However, set the flag to indicate there will not be another attempt at this.
-
             m_graph->destress(m_colaOpts);
             mightNeedToDestress = false;
             log(string_format("%02d_%02d_destress", ln, lns++));

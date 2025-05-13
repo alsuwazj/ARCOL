@@ -50,7 +50,7 @@ void doHOLA(dialect::Graph &G, const dialect::HolaOpts &holaOpts, dialect::Logge
 //!                    are set in the Graph's SepMatrix.
 void doHOLA(dialect::Graph &G);
 
-
+void printAspectRatio(dialect::Graph &G,const std::string& label);
 } // namespace dialect
 
 #endif // DIALECT_HOLA_H

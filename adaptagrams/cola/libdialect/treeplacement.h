@@ -165,14 +165,14 @@ public:
     bool somePointOppositeSegment(LineSegment &seg, Avoid::Point &pt, double padding=-1, bool openInterval=false);
 
     //! @brief  Rotate, flip, and translate the tree as necessary to match this placement.
-    virtual void applyGeometryToTree(void);
+    void applyGeometryToTree(void);
 
     //! @brief  Insert the tree into a given Graph.
     //! @param[out] G  The Graph into which the tree is to be inserted.
     //! @param[out] treeNodes  A place to record the tree nodes that are constructred.
     //! @param[out] bufferNodes  A place to record the buffer nodes that are constructred.
     //! @param[out] treeEdges  A place to record the tree edges that are added.
-    virtual void insertTreeIntoGraph(Graph &G, NodesById &treeNodes, NodesById &bufferNodes, EdgesById &treeEdges);
+    void insertTreeIntoGraph(Graph &G, NodesById &treeNodes, NodesById &bufferNodes, EdgesById &treeEdges);
 
     //! @brief  Check the size (i.e. number of nodes in) the Tree.
     size_t size(void) const { return m_tree->size(); }
@@ -215,13 +215,9 @@ private:
     //! Want to know which other nodes are aligned with the root node in each dimension.
     std::map<vpsc::Dim, std::set<id_type>> m_rootAligns;
 
-
-
 };
 
 
 } // namespace dialect
-
-
 
 #endif // DIALECT_TREEPLACEMENT_H

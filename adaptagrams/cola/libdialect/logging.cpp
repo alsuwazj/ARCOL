@@ -29,8 +29,6 @@
 #include "libdialect/io.h"
 #include "libdialect/graphs.h"
 #include "libdialect/logging.h"
-#include <filesystem>
-namespace fs = std::filesystem;
 
 using namespace dialect;
 
@@ -40,17 +38,6 @@ using std::vector;
 Logger::Logger(std::string outputDir, std::string prefix, bool verbose, bool addSVG)
     : outputDir(outputDir), prefix(prefix), verbose(verbose), addSVG(addSVG)
 {
-    try {
-        for (const auto &entry : fs::directory_iterator(outputDir)) {
-            if (fs::is_regular_file(entry)) {
-                fs::remove(entry.path());
-                std::cout << "Deleted: " << entry.path() << std::endl;
-            }
-        }
-    } catch (const std::exception &e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-
     if (outputDir.size() > 0) hasOutputDir = true;
     if (prefix.size() > 0) {
         hasPrefix = true;

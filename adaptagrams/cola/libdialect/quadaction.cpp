@@ -119,7 +119,7 @@ void Quad::sortAndComputeCosts() {
         CCost = 0;
         return;
     }
-    // Sort the Nbrs by deflection //Z: Deflection is a measure of how far a neighbor is from a straight line.
+    // Sort the Nbrs by deflection
     sort(nbrs.begin(), nbrs.end(),
         [](const Nbr_SP &a, const Nbr_SP &b) -> bool {
             return a->deflection() < b->deflection();
@@ -229,7 +229,7 @@ Assignments Arrangement::computeNAssignments(unsigned N) const {
     // Some semiaxes may already have Nbrs assigned to them.
     // Let n be the number of semiaxes waiting to be filled before
     // we have an N-assignment.
-    vector<unsigned> vac = vacancy(); //checks which of the four cardinal directions are occupied
+    vector<unsigned> vac = vacancy();
     int n = N;
     for (unsigned i = 0; i < 4; ++i) n -= vac[i];
     // If n < 0 then we already have /more/ than N semiaxes with neighbours

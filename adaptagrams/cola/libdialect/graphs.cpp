@@ -73,11 +73,6 @@ using Avoid::Point;
 id_type Node::nextID = 0;
 id_type Edge::nextID = 0;
 
-namespace dialect {
-    std::shared_ptr<double> sharedWidth = std::make_shared<double>(1200.0);
-    std::shared_ptr<double> sharedHeight = std::make_shared<double>(400.0);
-}
-
 //! @brief  Adding two bounding boxes returns the bounding box of their union.
 BoundingBox operator+(const BoundingBox &lhs, const BoundingBox &rhs) {
     BoundingBox sum = lhs;
@@ -584,31 +579,10 @@ string Graph::writeSvg(bool useExternalIds) const {
     BoundingBox b = getBoundingBox(ignore, includeBends);
     double pad = 8;
     b.x -= pad; b.X += pad; b.y -= pad; b.Y += pad;
-    ColaOptions opts;
-    //Z
-    // **Bounding Box Rectangle**
-    //if (pageConstraint) {  // Ensure `pageConstraint` exists
-    double bb_x = 0;//pageConstraint->getActualLeftMargin(vpsc::Dim::XDIM);  // Left
-    double bb_y = 0;//pageConstraint->getActualLeftMargin(vpsc::Dim::YDIM);  // Top
-    std::cout <<"*opts.newWidth "<<*opts.newWidth << std::endl;
-    std::cout <<"*opts.newHeight "<<*opts.newHeight << std::endl;
-    double bb_width = *opts.newWidth;//pageConstraint->getActualRightMargin(vpsc::Dim::XDIM) - bb_x;  // Width
-    double bb_height = *opts.newHeight;//pageConstraint->getActualRightMargin(vpsc::Dim::YDIM) - bb_y; // Height
-    double viewXMax = std::max(bb_width, b.w());
-    double viewYMax = std::max(bb_height, b.h() );
-
-
-
     ostringstream ss;
     ss << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     ss << "<svg xmlns:inkscape=\"http://www.inkscape.org/namespaces/inkscape\" xmlns=\"http://www.w3.org/2000/svg\" width=\"100%%\" height=\"100%%\" ";
-    //ss << string_format("viewBox=\"%g %g %g %g\">\n", b.x, b.y, b.w(), b.h());
-    ss << string_format("viewBox=\"%g %g %g %g\">\n",
-                        std::min(bb_x, b.x) - 2,  // Shift to the left
-                        std::min(bb_y, b.y) - 2,
-                        std::max(bb_width, b.w()) + 4,  // Increase width
-                        std::max(bb_height, b.h()) + 4); // Increase height
-
+    ss << string_format("viewBox=\"%g %g %g %g\">\n", b.x, b.y, b.w(), b.h());
     // Edges
     for (auto p : m_edges) {
         Edge_SP e = p.second;
@@ -619,23 +593,6 @@ string Graph::writeSvg(bool useExternalIds) const {
         Node_SP u = p.second;
         ss << u->writeSvg(useExternalIds);
     }
-
-
-        // Draw bounding box
-    ss << string_format(
-            "<rect x=\"%g\" y=\"%g\" width=\"%g\" height=\"%g\" "
-            "stroke=\"red\" fill=\"none\" stroke-width=\"2\" "
-            "vector-effect=\"non-scaling-stroke\"/>\n",
-            bb_x, bb_y, bb_width, bb_height
-    );
-//    ss << "<rect x=\"0\" y=\"0\" width=\"300\" height=\"900\" stroke=\"red\" fill=\"none\" stroke-width=\"2\"/>\n";
-//    ss << "<rect x=\"0\" y=\"0\" width=\"300\" height=\"900\" "
-//          "stroke=\"red\" fill=\"none\" stroke-width=\"2\" "
-//          "vector-effect=\"non-scaling-stroke\"/>\n";
-
-    // }
-
-
     ss << "</svg>\n";
     return ss.str();
 }
@@ -647,12 +604,9 @@ void Graph::recomputeMaxDegree(void) {
 }
 
 double Graph::autoInferIEL(void) {
-    m_iel = 4*computeAvgNodeDim(); //Z: for filling all the space 4 is the best for now
+    m_iel = 2*computeAvgNodeDim();
     return m_iel;
 }
-void Graph::setIEL(double iel) {
-    m_iel = iel; }
-
 
 double Graph::getIEL(void) {
     if (m_iel == 0) autoInferIEL();
@@ -896,7 +850,7 @@ SparseIdMatrix2d<Edge_SP>::type Graph::getEdgeBySrcIdTgtIdLookup(void) const {
 }
 
 void Graph::destress(void) {
-    ColaOptions opts; //default settings
+    ColaOptions opts;
     destress(opts);
 }
 
@@ -909,28 +863,12 @@ void Graph::destress(const ColaOptions &opts) {
     std::function<void(Graph&, string)> log = [logger](Graph &H, string name)->void{
         if (logger!=nullptr) logger->log(H, name);
     };
-    //Z: define bounding box
 
-       // cola::PageBoundaryConstraints pageConstraint(0, opts.newWidth, 0, opts.newHeight, 55000);; //0.21666
-    cola::PageBoundaryConstraints pageConstraint(0, *opts.newWidth, 0, *opts.newHeight, 55000);
     // Handle the version with solidified edges separately:
     if (opts.solidifyAlignedEdges) {
         // Copy the opts and deactivate the aligned edges option to avoid infinite loop.
-        updateColaGraphRep();
         ColaOptions opts2(opts);
-        for (auto &p: m_nodes) {
-            Node_SP u = p.second;
-            auto dimensions = u->getDimensions();
-            double nodeWidth = dimensions.first;
-            double nodeHeight = dimensions.second;
-            pageConstraint.addShape(m_cgr.id2ix.at(u->id()), nodeWidth / 2, nodeHeight / 2);
-        }
-
-        // Apply constraint inside opts2
-        opts2.ccs.push_back(&pageConstraint);
-
         opts2.solidifyAlignedEdges = false;
-        opts2.preventOverlaps =true;
         // Also make sure the options request makeFeasible, which should always be done first,
         // so that any overlaps between edgenodes are resolved in the right way.
         // Don't use any extra border.
@@ -946,7 +884,6 @@ void Graph::destress(const ColaOptions &opts) {
         log(Hy, string_format("%02d_%02d_with_solid_V_edges", ln, lns++));
         opts2.xAxis = true;
         opts2.yAxis = false;
-        //opts2.aspectRatioCons =true;
         Hy.destress(opts2);
         log(Hy, string_format("%02d_%02d_destressed_with_solid_V_edges", ln, lns++));
 
@@ -966,7 +903,6 @@ void Graph::destress(const ColaOptions &opts) {
         // Set up the ideal edge length.
         double iel = opts.idealEdgeLength;
         if (iel == 0) iel = getIEL();
-        //iel *=2;
         // If using neighbour stress, apply the scalar.
         if (opts.useNeighbourStress) iel *= opts.nbrStressIELScalar;
         // Set up the constraints.
@@ -976,29 +912,8 @@ void Graph::destress(const ColaOptions &opts) {
         // (We cannot simply add the SepMatrix to the given vector, since this would lead to redundant
         //  constraints if the same ColaOptions object was used again.)
         ccs.push_back(&m_sepMatrix);
-
-
-        std::cout <<"opts.aspectRatioCons " <<opts.aspectRatioCons <<std::endl;
-        if (true) {
-//        Add each node to the page boundary constraints
-            //m_nodes is a map of nodes, where each node ID is mapped to a Node_SP.
-            for (auto &p: m_nodes) {
-                Node_SP u = p.second;
-                auto dimensions = u->getDimensions();  // FIXED: get width & height
-                double nodeWidth = dimensions.first;
-                double nodeHeight = dimensions.second;
-                //m_cgr.id2ix this is just to map the indecies betewwn cola nad dialect libraries
-                //this is because the layout system represents the graph as a numerical model rather than using raw Node IDs.
-                //this is how cola deal with the nodes by their indecies not IDs
-                pageConstraint.addShape(m_cgr.id2ix.at(u->id()), nodeWidth / 2, nodeHeight / 2); // divide by 2 to consider the center
-
-            }
-            ccs.push_back(&pageConstraint); //
-            //std::cout << "Total Constraints in opts: " << ccs.size() << std::endl;
-        }
-
         // Construct and run the layout object.
-        if (opts.useMajorization) { //not used in HOLA
+        if (opts.useMajorization) {
             // We use ConstrainedMajorizationLayout.
             cola::ConstrainedMajorizationLayout alg(
                         m_cgr.rs, m_cgr.es, m_cgr.rc, iel,
@@ -1019,8 +934,6 @@ void Graph::destress(const ColaOptions &opts) {
             alg.setConstraints(ccs);
             alg.setClusterHierarchy(m_cgr.rc);
             if (opts.makeFeasible) alg.makeFeasible(opts.makeFeasible_xBorder, opts.makeFeasible_yBorder);
-//            opts.xAxis = false;
-//            opts.yAxis = true;
             alg.run(opts.xAxis, opts.yAxis);
         }
         // Update node positions.

@@ -4,18 +4,33 @@
 #include "libdialect/graphs.h"
 #include "libdialect/hola.h"
 #include "libdialect/io.h"
+#include "libdialect/nodeconfig.h"
+#include "libcola/cola_log.h"
+
+
 
 using namespace dialect;
 
 int main(int argc, char *argv[]) {
+    cola::Output2FILE::Stream() = stderr;
+
+    cola::FILELog::ReportingLevel() = cola::logDEBUG4;
+    FILE_LOG(cola::logDEBUG) << "Logging initialized in libcola.";
     // Ensure we have input and output filenames
-    if (argc != 3) {
+    if (argc < 3) {
         std::cerr << "Usage: " << argv[0] << " input.tglf output.tglf" << std::endl;
         return 1;
     }
+    //double aspectRatio = 1.0; //default
 
     std::string inputFile = argv[1];
     std::string outputFile = argv[2];
+    if (argc >= 4) {
+        std::string aspectRatio = argv[3];
+        GLOBAL_ASPECT_RATIO = std::stod(aspectRatio);
+    }
+
+
 
     // Generate the corresponding SVG filename
     std::string svgFile = outputFile.substr(0, outputFile.find_last_of(".")) + ".svg";

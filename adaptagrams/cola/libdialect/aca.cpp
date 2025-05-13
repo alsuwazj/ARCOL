@@ -222,7 +222,7 @@ ACALayout::ACALayout(std::shared_ptr<dialect::Graph> G)
     m_es = colaRep.es;
     m_ccs.push_back(&G->getSepMatrix());
     // Cola Options:
-    m_idealLength =  G->getIEL();
+    m_idealLength = G->getIEL();
     m_edgeLengths = cola::StandardEdgeLengths;
     m_doneTest = nullptr;
     m_preIteration = nullptr;
@@ -289,7 +289,7 @@ bool ACALayout::createOneAlignment(void)
 
 bool ACALayout::applyOAsAllOrNothing(OrderedAlignments oas)
 {
-    if (!m_nocsInitialised) initNOCs(); // Non-Overlap Constraints. this is just to set uo the nodes that are ok to overlap like dummy nodes
+    if (!m_nocsInitialised) initNOCs();
     bool b = allOrNothing(oas);
     return b;
 }
@@ -882,20 +882,6 @@ void ACALayout::acaLoopAllAtOnce(void)
     layoutWithCurrentConstraints();
 }
 
-
-//Z:
-    bool ACALayout::isNodeWithinPage(Node_SP node,
-                                     double left, double right,
-                                     double top, double bottom) const {
-
-
-
-        return (node->getBoundingBox().x >= left &&
-                node->getBoundingBox().X <= right &&
-                node->getBoundingBox().y >= top &&
-                node->getBoundingBox().Y <= bottom);
-    }
-
 bool ACALayout::allOrNothing(OrderedAlignments oas)
 {
     bool okay = true;
@@ -904,23 +890,6 @@ bool ACALayout::allOrNothing(OrderedAlignments oas)
     for (OrderedAlignments::const_iterator it=oas.begin(); it!=oas.end(); ++it) {
         OrderedAlignment *oa = *it;
         okay = applyIfFeasible(oa);
-        //z:
-//        if (okay) {
-//            // Convert cola indices to node IDs using m_graph->ix2id (or equivalent)
-//            id_type id1 = m_graph->getNodeIDFromIndex(oa->src);
-//            id_type id2 = m_graph->getNodeIDFromIndex(oa->tgt);
-//
-//            // Retrieve the nodes by ID
-//            Node_SP n1 = m_graph->getNode(id1);
-//            Node_SP n2 = m_graph->getNode(id2);
-//
-//            // Check if either node is outside the page boundary
-//            if (!isNodeWithinPage(n1, 0, 800, 0, 1000) ||
-//                !isNodeWithinPage(n2, 0, 800, 0, 1000)) {
-//                okay = false;
-//            }
-//        }
-
         if (!okay) break;
     }
     if (!okay) {
@@ -1363,7 +1332,7 @@ OrderedAlignment *ACALayout::mostRecentOA(void)
 /// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 /// Feasibility Checking
 
-// This preprocessor directive controls whether ACA does a full VPSC solve, or //z: Variable Placement with Separation Constraints
+// This preprocessor directive controls whether ACA does a full VPSC solve, or
 // a mere VPSC satisfy, on each of the four checks performed in the applyIfFeasible
 // method. If defined, we do a full solve on each check.
 // Experimentation has shown better performance when this IS defined.
@@ -1449,22 +1418,6 @@ bool ACALayout::applyIfFeasible(OrderedAlignment *oa)
         recomputeEdgeShapes(alnd);
         alnnocs->generateSeparationConstraints(alnd,alnv,alnc,alnr);
         alnnocsolv = satisfy(alnv,alnc,feasible);
-
-        //Z: putting the boundry check here fails
-        if (true) {
-            const id_type id1 = m_graph->getColaGraphRep().ix2id.at(oa->src);
-            const id_type id2 = m_graph->getColaGraphRep().ix2id.at(oa->tgt);
-            Node_SP node1 = m_graph->getNode(id1);
-            Node_SP node2 = m_graph->getNode(id2);
-            ColaOptions opts;
-
-            //I have to meke the values of the boundary gloal. this is not good
-            if (!isNodeWithinPage(node1, 0, *opts.newWidth, 0, *opts.newHeight) ||
-                !isNodeWithinPage(node2, 0, *opts.newWidth, 0, *opts.newHeight)) {
-                feasible = false;
-            }
-        }
-
     }
 
     // 4. Non-Overlap in the dimension of the separation constraint:
@@ -1495,16 +1448,6 @@ bool ACALayout::applyIfFeasible(OrderedAlignment *oa)
 #endif
         // Accept the new node positions.
         updateNodeRectsFromVars();
-
-        //z: this gives me bounded layout but it is not alligned. it is like no feasible assignments
-//        for (int i = 0; i < m_n; ++i) {
-//            const id_type id = m_graph->getColaGraphRep().ix2id.at(i);
-//            Node_SP node = m_graph->getNode(id);
-//            if (!isNodeWithinPage(node, 0, 300, 0, 900)) {
-//                feasible = false;
-//                break;
-//            }
-//        }
         // Pop state just once to get rid of the NOCs, but keep the new ordered alignment.
         popState();
         // We do not need the other state and node coords that we saved.

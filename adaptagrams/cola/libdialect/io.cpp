@@ -56,11 +56,11 @@ Graph_SP dialect::buildGraphFromTglf(std::string &s) {
 //   https://stackoverflow.com/questions/7868936/read-file-line-by-line
 //   https://stackoverflow.com/a/7868998
 Graph_SP dialect::buildGraphFromTglf(istream &in) {
-    Graph_SP graph = std::make_shared<Graph>(); // create empty graph object
-    NodesById nodesByExternalId; //mapping the nodes with their IDs
+    Graph_SP graph = std::make_shared<Graph>();
+    NodesById nodesByExternalId;
     unsigned extId;
     string line;
-    unsigned state = 0; //tracks which section of the TGLF file is currently being parsed. state 0: nodes state 1: edges
+    unsigned state = 0;
     double cx, cy, w, h;
     unsigned i1, i2;
     char gtc, dir, rel1, rel2;
@@ -75,7 +75,7 @@ Graph_SP dialect::buildGraphFromTglf(istream &in) {
         // Check for "#" lines.
         if (line == "#") {
             // Time to change state.
-            COLA_ASSERT(++state < 3); // we should not have more than 2 states
+            COLA_ASSERT(++state < 3);
             // And continue to the next line.
             continue;
         }
@@ -84,14 +84,14 @@ Graph_SP dialect::buildGraphFromTglf(istream &in) {
         switch (state) {
         case 0:
             // NODES
-            COLA_ASSERT(iss >> extId >> cx >> cy >> w >> h); //<NodeID> <CenterX> <CenterY> <Width> <Height>
+            COLA_ASSERT(iss >> extId >> cx >> cy >> w >> h);
             COLA_ASSERT(w > 0);
             COLA_ASSERT(h > 0);
             node = Node::allocate();
             node->setExternalId(extId);
             node->setCentre(cx, cy);
             node->setDims(w, h);
-            graph->addNode(node); // add the node to the graph
+            graph->addNode(node);
             nodesByExternalId.insert({extId, node});
             break;
         case 1:
@@ -103,7 +103,7 @@ Graph_SP dialect::buildGraphFromTglf(istream &in) {
             }
             graph->addEdge(edge);
             break;
-        case 2: // in hola we do not have this
+        case 2:
             // SEPCOS
             COLA_ASSERT(iss >> i1 >> i2 >> gtc >> dir >> rel1 >> rel2 >> gap);
             id_type j1 = nodesByExternalId[i1]->id(),

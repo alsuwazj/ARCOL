@@ -57,7 +57,7 @@ FaceSet::FaceSet(Graph_SP &G)
     : m_graph(G)
 {
     // Compute the faces and identify the external one.
-    computeFaces(); //detects all closed regions (faces) in the graph.
+    computeFaces();
     identifyExternalFace();
     // Index the faces by the IDs of the Nodes that belong to them.
     for (Face_SP face : m_faces) {
@@ -91,9 +91,8 @@ void FaceSet::computeFaces(void) {
     // IDs, with two directed edges per edge of the given graph G, one in
     // each direction.
     std::list<IdPair> edgeList;
-    for (auto pair : m_graph->getEdgeLookup()) { //loop over all edges in the graph
-        Edge_SP &e = pair.second; //maybe the first is the id and the second is the actual edge
-        std::cout << "Edge_SP &e = pair.second; "<< pair.second << ", first " << pair.first << std::endl;
+    for (auto pair : m_graph->getEdgeLookup()) {
+        Edge_SP &e = pair.second;
         id_type s = e->getSourceEnd()->id(),
                 t = e->getTargetEnd()->id();
         edgeList.push_back({s, t});
@@ -108,7 +107,7 @@ void FaceSet::computeFaces(void) {
     for (auto pair : m_graph->getNodeLookup()) {
         id_type uID = pair.first;
         Node_SP &u = pair.second;
-        Nodes nbrs = u->getNeighboursCwCyclic(); // now we have sorted neighbors
+        Nodes nbrs = u->getNeighboursCwCyclic();
         vector<id_type> nbrIds;
         nbrIds.reserve(nbrs.size());
         for (Node_SP v : nbrs) nbrIds.push_back(v->id());
@@ -214,7 +213,6 @@ void FaceSet::identifyExternalFace(void) {
             break;
         }
     }
-
 }
 
 TreePlacements FaceSet::listAllPossibleTreePlacements(Tree_SP tree) {

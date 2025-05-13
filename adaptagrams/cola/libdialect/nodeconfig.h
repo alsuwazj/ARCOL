@@ -31,7 +31,7 @@
 #include "libdialect/aca.h"
 #include "libdialect/quadaction.h"
 #include "libdialect/logging.h"
-
+extern double GLOBAL_ASPECT_RATIO;
 namespace dialect {
 
 //! @brief  Options to control OrthoHubLayout
