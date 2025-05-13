@@ -24,6 +24,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/peeling.cpp" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/peeling.cpp.o" "gcc" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/peeling.cpp.o.d"
   "/home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/quadaction.cpp" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/quadaction.cpp.o" "gcc" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/quadaction.cpp.o.d"
   "/home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/routing.cpp" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/routing.cpp.o" "gcc" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/routing.cpp.o.d"
+  "/home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/sides.cpp" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o" "gcc" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o.d"
   "/home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/treeplacement.cpp" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/treeplacement.cpp.o" "gcc" "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/treeplacement.cpp.o.d"
   "/home/alsuwazj/HolaCmake/main.cpp" "CMakeFiles/HolaCmake.dir/main.cpp.o" "gcc" "CMakeFiles/HolaCmake.dir/main.cpp.o.d"
   )

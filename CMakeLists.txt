@@ -32,7 +32,7 @@ set(SOURCES
         adaptagrams/cola/libdialect/quadaction.cpp
         adaptagrams/cola/libcola/cola.cpp
         adaptagrams/cola/libcola/colafd.cpp
-        adaptagrams/cola/libdialect/mytreeplacement.h
+        adaptagrams/cola/libdialect/sides.cpp
 )
 
 # Create an executable
