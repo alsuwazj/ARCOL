@@ -43,8 +43,8 @@ namespace dialect {
 enum ACAFlag {
     ACAHORIZ = 1,
     ACAVERT  = 2,
-    ACADELIB = 4,
-    ACACONN  = 8
+    ACADELIB = 4, //alignment involving a "deliberate" bend
+    ACACONN  = 8 // alignment for connected edges
 };
 
 enum ACASepFlag {
@@ -245,6 +245,7 @@ public:
 
     cola::ConstrainedFDLayout *getFDLayout(void);
 
+ double predictARDelta(int edgeIndex, ACASepFlag sf);
     // Configuration methods:
 
     /**
@@ -292,6 +293,7 @@ public:
      * bend points will be created before leaf edges are aligned. This can be
      * reversed by altering the BP_PENALTY and LEAF_PENALTY constants.
      */
+
     void useNonLeafDegree(bool b);
     /**
      * @brief Say whether alignment choices should alternate with stress

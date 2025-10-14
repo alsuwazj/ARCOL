@@ -42,7 +42,8 @@ using namespace dialect;
 using Avoid::Point;
 
 using std::string;
-double GLOBAL_ASPECT_RATIO = 1.0;
+double GLOBAL_ASPECT_RATIO =1.0;
+
 OrthoHubLayout::OrthoHubLayout(Graph_SP G, OrthoHubLayoutOptions opts)
     : m_graph(G),
       m_opts(opts),
@@ -128,6 +129,7 @@ void OrthoHubLayout::layout(Logger *logger) {
     // Set up for logging.
     unsigned ln = logger != nullptr ? logger->nextLoggingIndex : 0;
     unsigned lns = 0;
+
     std::function<void(string)> log = [this, logger](string name)->void{
         if (logger!=nullptr) logger->log(*(this->m_graph), name);
     };

@@ -317,6 +317,7 @@ inline double ConstrainedMajorizationLayout
 }
 
 void ConstrainedMajorizationLayout::run(bool x, bool y) {
+
     if(constrainedLayout) {
         vector<vpsc::Rectangle*>* pbb = boundingBoxes.empty()?nullptr:&boundingBoxes;
         SolveWithMosek mosek = Off;

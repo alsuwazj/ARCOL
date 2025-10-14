@@ -33,6 +33,8 @@ set(SOURCES
         adaptagrams/cola/libcola/cola.cpp
         adaptagrams/cola/libcola/colafd.cpp
         adaptagrams/cola/libdialect/sides.cpp
+        adaptagrams/cola/libdialect/edges.cpp
+        adaptagrams/cola/libdialect/planarise.cpp
 )
 
 # Create an executable

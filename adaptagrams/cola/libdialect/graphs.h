@@ -45,7 +45,7 @@
 #include "libdialect/routing.h"
 #include "libdialect/ortho.h"
 #include "libdialect/logging.h"
-
+extern double finalStress ;
 namespace dialect {
 
 //! @brief  A bounding box, given by the extreme coordinates.
@@ -187,6 +187,8 @@ public:
 
     //! @brief  Destructor
     ~Graph(void);
+
+
 
     //! @brief  Swap operator.
     friend void swap(Graph &first, Graph &second) {
@@ -677,11 +679,14 @@ public:
     //! @sa transformClosedSubset
     void transformOpenSubset(SepTransform tf, const std::set<id_type> &ids);
 
+    std::map<std::pair<id_type,id_type>, double> computeEdgeLengths() const;
+
     // For debugging:
     std::string m_debugOutputPath = "";
     unsigned m_projectionDebugLevel = 0;
-
+    void setNeedNewRectangles(bool v) { m_needNewRectangles = v; }
 private:
+
     SepMatrix m_sepMatrix;
 
     //! Ideal edge length
@@ -711,6 +716,7 @@ private:
     //! Common implementation for the two directional 90-degree rotation methods.
     void rotate90(PlaneMap nodeMap, std::function<void(Edge_SP)> edgeMap, SepTransform st, ColaOptions *opts=nullptr);
 
+
     //! For building ConstrainedFDLayout objects we keep a ColaGraphRep.
     ColaGraphRep m_cgr;
     //! Keep track of whether the set of Nodes has changed since last time we
@@ -729,6 +735,7 @@ private:
     //! Node position stack, for saving positions while attempting
     //! possible layouts.
     std::stack<std::map<id_type, Avoid::Point>> m_posStack;
+
 
 };
 
@@ -1150,6 +1157,7 @@ public:
     //! @brief  Write the data for an orthogonal SVG path for this Edge's connector route,
     //!         using rounded bends.
     std::string writeRoundedOrthoConnectorData(void) const;
+
 
 private:
     //! @brief  Standard constructor.

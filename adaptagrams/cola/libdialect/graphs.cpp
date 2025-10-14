@@ -41,6 +41,7 @@
 #include "libcola/cluster.h"
 #include "libcola/cola.h"
 
+
 #include "libdialect/constraints.h"
 #include "libdialect/io.h"
 #include "libdialect/util.h"
@@ -48,9 +49,9 @@
 #include "libdialect/logging.h"
 #include "libdialect/routing.h"
 #include "libdialect/graphs.h"
-
+#include "libdialect/nodeconfig.h"
 using namespace dialect;
-
+double finalStress =-1;
 using std::max;
 using std::min;
 using std::vector;
@@ -69,6 +70,7 @@ using vpsc::Rectangles;
 using cola::CompoundConstraints;
 
 using Avoid::Point;
+
 
 id_type Node::nextID = 0;
 id_type Edge::nextID = 0;
@@ -138,6 +140,12 @@ Graph::~Graph(void) {
     delete m_cfdl;
     for (Rectangle *r : m_cgr.rs) delete r;
 }
+
+
+
+
+
+
 
 Graph &Graph::operator=(Graph other) {
     // Thanks to https://stackoverflow.com/a/3279550
@@ -910,10 +918,10 @@ void Graph::destress(const ColaOptions &opts) {
         cola::CompoundConstraints ccs(opts.ccs);
         // And add the SepMatrix.
         // (We cannot simply add the SepMatrix to the given vector, since this would lead to redundant
-        //  constraints if the same ColaOptions object was used again.)
+        //  constraints if the same ColaOptions object was used again.
         ccs.push_back(&m_sepMatrix);
         // Construct and run the layout object.
-        if (opts.useMajorization) {
+        if (opts.useMajorization) { //never used in hola
             // We use ConstrainedMajorizationLayout.
             cola::ConstrainedMajorizationLayout alg(
                         m_cgr.rs, m_cgr.es, m_cgr.rc, iel,
@@ -1095,11 +1103,25 @@ bool Graph::applyProjSeq(const ColaOptions &opts, ProjSeq &ps, int accept) {
 }
 
 void Graph::solidifyAlignedEdges(vpsc::Dim dim, const ColaOptions &opts) {
+    // double sxe,sye;
+    // if(GLOBAL_ASPECT_RATIO <= 1.0){
+    //     sxe = 1.0 ;
+    //     sye =  1.0 / GLOBAL_ASPECT_RATIO;
+    //     //std::cout<<"sy "<<sy<<std::endl;
+    // } else {
+    //     sxe =  GLOBAL_ASPECT_RATIO;
+    //     sye = 1.0 ;
+    // }
+
     // For the nodes representing aligned Edges, we avoid making rectangles that would be shorter
     // than a certain minimal length. (If they are zero length, VPSC is unhappy.)
     // Constants have been experimnetally determined.
     const double MIN_LENGTH = 0.01;
-    const double GAP = 1;
+
+    // double MIN_LENGTH_X = 0.01 / sxe;
+    // double MIN_LENGTH_Y = 0.01 / sye;
+
+    const double GAP = 1;// to prevent overlap
     // Exemptions may be passed in the ColaOptions, in the form of an EdgesById lookup.
     // Thus have two ordered lookups of Edges to compare, so iterate properly for linear time complexity.
     auto it = m_edges.begin();
@@ -1148,6 +1170,7 @@ void Graph::solidifyAlignedEdges(vpsc::Dim dim, const ColaOptions &opts) {
             SepDir sd;
             double srcGap, tgtGap;
             // Set position and dimensions for edgenode, and determine the cardinal direction.
+            double len;
             if (dim == vpsc::VERTICAL) {
                 double h = min(
                     fabs(btgt.y - bsrc.Y), fabs(bsrc.y - btgt.Y)
@@ -1159,12 +1182,12 @@ void Graph::solidifyAlignedEdges(vpsc::Dim dim, const ColaOptions &opts) {
                 edgeNode->setCentre(cx, cy);
                 if (csrc.y < ctgt.y) {
                     sd = SepDir::SOUTH;
-                    srcGap = cy - csrc.y;
-                    tgtGap = ctgt.y - cy;
+                    srcGap = (cy - csrc.y);
+                    tgtGap = (ctgt.y - cy) ;
                 } else {
                     sd = SepDir::NORTH;
-                    srcGap = csrc.y - cy;
-                    tgtGap = cy - ctgt.y;
+                    srcGap = (csrc.y - cy);
+                    tgtGap = (cy - ctgt.y);
                 }
             } else {
                 double w = min(
@@ -1177,12 +1200,12 @@ void Graph::solidifyAlignedEdges(vpsc::Dim dim, const ColaOptions &opts) {
                 edgeNode->setCentre(cx, cy);
                 if (csrc.x < ctgt.x) {
                     sd = SepDir::EAST;
-                    srcGap = cx - csrc.x;
-                    tgtGap = ctgt.x - cx;
+                    srcGap = (cx - csrc.x);
+                    tgtGap = (ctgt.x - cx);
                 } else {
                     sd = SepDir::WEST;
-                    srcGap = csrc.x - cx;
-                    tgtGap = cx - ctgt.x;
+                    srcGap = (csrc.x - cx);
+                    tgtGap = (cx - ctgt.x);
                 }
             }
             // Add the node to the graph.
@@ -1409,4 +1432,32 @@ void Graph::transformClosedSubset(SepTransform tf, const std::set<id_type> &ids)
 
 void Graph::transformOpenSubset(SepTransform tf, const std::set<id_type> &ids) {
     m_sepMatrix.transformOpenSubset(tf, ids);
+}
+
+std::map<std::pair<id_type,id_type>, double> Graph::computeEdgeLengths() const {
+    std::map<std::pair<id_type,id_type>, double> lengths;
+
+    for (const auto &entry : m_edges) {
+        const Edge_SP &edge = entry.second;
+
+        Node_SP src = edge->getSourceEnd();
+        Node_SP tgt = edge->getTargetEnd();
+
+        Point csrc = src->getCentre();
+        Point ctgt = tgt->getCentre();
+
+        double len = std::sqrt(
+            (csrc.x - ctgt.x) * (csrc.x - ctgt.x) +
+            (csrc.y - ctgt.y) * (csrc.y - ctgt.y)
+        );
+
+        // normalize (sid, tid) so it's consistent
+        id_type sid = src->id();
+        id_type tid = tgt->id();
+        if (sid > tid) std::swap(sid, tid);
+
+        lengths[{sid, tid}] = len;
+    }
+
+    return lengths;
 }

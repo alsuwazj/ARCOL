@@ -249,6 +249,30 @@ adaptagrams/cola/libdialect/constraints.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/constraints.cpp.s
 .PHONY : adaptagrams/cola/libdialect/constraints.cpp.s
 
+adaptagrams/cola/libdialect/edges.o: adaptagrams/cola/libdialect/edges.cpp.o
+.PHONY : adaptagrams/cola/libdialect/edges.o
+
+# target to build an object file
+adaptagrams/cola/libdialect/edges.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o
+.PHONY : adaptagrams/cola/libdialect/edges.cpp.o
+
+adaptagrams/cola/libdialect/edges.i: adaptagrams/cola/libdialect/edges.cpp.i
+.PHONY : adaptagrams/cola/libdialect/edges.i
+
+# target to preprocess a source file
+adaptagrams/cola/libdialect/edges.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.i
+.PHONY : adaptagrams/cola/libdialect/edges.cpp.i
+
+adaptagrams/cola/libdialect/edges.s: adaptagrams/cola/libdialect/edges.cpp.s
+.PHONY : adaptagrams/cola/libdialect/edges.s
+
+# target to generate assembly for a file
+adaptagrams/cola/libdialect/edges.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.s
+.PHONY : adaptagrams/cola/libdialect/edges.cpp.s
+
 adaptagrams/cola/libdialect/expansion.o: adaptagrams/cola/libdialect/expansion.cpp.o
 .PHONY : adaptagrams/cola/libdialect/expansion.o
 
@@ -465,6 +489,30 @@ adaptagrams/cola/libdialect/peeling.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/peeling.cpp.s
 .PHONY : adaptagrams/cola/libdialect/peeling.cpp.s
 
+adaptagrams/cola/libdialect/planarise.o: adaptagrams/cola/libdialect/planarise.cpp.o
+.PHONY : adaptagrams/cola/libdialect/planarise.o
+
+# target to build an object file
+adaptagrams/cola/libdialect/planarise.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o
+.PHONY : adaptagrams/cola/libdialect/planarise.cpp.o
+
+adaptagrams/cola/libdialect/planarise.i: adaptagrams/cola/libdialect/planarise.cpp.i
+.PHONY : adaptagrams/cola/libdialect/planarise.i
+
+# target to preprocess a source file
+adaptagrams/cola/libdialect/planarise.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.i
+.PHONY : adaptagrams/cola/libdialect/planarise.cpp.i
+
+adaptagrams/cola/libdialect/planarise.s: adaptagrams/cola/libdialect/planarise.cpp.s
+.PHONY : adaptagrams/cola/libdialect/planarise.s
+
+# target to generate assembly for a file
+adaptagrams/cola/libdialect/planarise.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/HolaCmake.dir/build.make CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.s
+.PHONY : adaptagrams/cola/libdialect/planarise.cpp.s
+
 adaptagrams/cola/libdialect/quadaction.o: adaptagrams/cola/libdialect/quadaction.cpp.o
 .PHONY : adaptagrams/cola/libdialect/quadaction.o
 
@@ -609,6 +657,9 @@ help:
 	@echo "... adaptagrams/cola/libdialect/constraints.o"
 	@echo "... adaptagrams/cola/libdialect/constraints.i"
 	@echo "... adaptagrams/cola/libdialect/constraints.s"
+	@echo "... adaptagrams/cola/libdialect/edges.o"
+	@echo "... adaptagrams/cola/libdialect/edges.i"
+	@echo "... adaptagrams/cola/libdialect/edges.s"
 	@echo "... adaptagrams/cola/libdialect/expansion.o"
 	@echo "... adaptagrams/cola/libdialect/expansion.i"
 	@echo "... adaptagrams/cola/libdialect/expansion.s"
@@ -636,6 +687,9 @@ help:
 	@echo "... adaptagrams/cola/libdialect/peeling.o"
 	@echo "... adaptagrams/cola/libdialect/peeling.i"
 	@echo "... adaptagrams/cola/libdialect/peeling.s"
+	@echo "... adaptagrams/cola/libdialect/planarise.o"
+	@echo "... adaptagrams/cola/libdialect/planarise.i"
+	@echo "... adaptagrams/cola/libdialect/planarise.s"
 	@echo "... adaptagrams/cola/libdialect/quadaction.o"
 	@echo "... adaptagrams/cola/libdialect/quadaction.i"
 	@echo "... adaptagrams/cola/libdialect/quadaction.s"

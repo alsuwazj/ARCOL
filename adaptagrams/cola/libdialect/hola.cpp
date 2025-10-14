@@ -27,9 +27,14 @@
 #include <string>
 #include <iostream>
 #include <cmath>
+#include <random>
+#include <limits>
+#include <vector>
 
 #include "libvpsc/rectangle.h"
 #include "libavoid/libavoid.h"
+
+#include "libcola/cola.h"
 
 #include "libdialect/commontypes.h"
 #include "libdialect/graphs.h"
@@ -46,16 +51,24 @@
 #include "libdialect/logging.h"
 #include "libdialect/util.h"
 #include "libdialect/hola.h"
+#include <chrono>
 
 using namespace dialect;
 
 using std::string;
+auto timeNow = std::chrono::high_resolution_clock::now;
+
 
 void dialect::doHOLA(Graph &G) {
     HolaOpts opts;
     doHOLA(G, opts);
 }
-
+void printDuration(const std::string& label,
+                   std::chrono::high_resolution_clock::time_point start,
+                   std::chrono::high_resolution_clock::time_point end) {
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cout << label << " took " << duration << " ms" << std::endl;
+}
 void dialect::printAspectRatio(Graph &G,  const std::string& label ) {
 
     BoundingBox bbox = G.getBoundingBox();
@@ -67,14 +80,271 @@ void dialect::printAspectRatio(Graph &G,  const std::string& label ) {
         std::cout << (label.empty() ? "" : label + ": ")
                   << "Aspect Ratio: " << aspectRatio
                   << " (W: " << width << ", H: " << height << ")" << std::endl;
-    } else {
-        std::cerr << (label.empty() ? "" : label + ": ")
-                  << "Warning: height is zero. Cannot compute aspect ratio." << std::endl;
     }
 }
 
-void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
+double computeAspectRatio(Graph &G ) {
 
+    BoundingBox bbox = G.getBoundingBox();
+    double width = bbox.w();
+    double height = bbox.h();
+
+    if (height != 0.0) {
+        double aspectRatio = width / height;
+        return aspectRatio;
+    }
+
+
+}
+
+
+static void scaleCoreToTargetAR(Graph& core,
+                                double targetAR = GLOBAL_ASPECT_RATIO)
+{
+    const auto& byId = core.getNodeLookup();
+    if (byId.empty()) return;
+
+    // collect bounding-box centres & compute overall bounds
+    double minX =  std::numeric_limits<double>::infinity();
+    double maxX = -std::numeric_limits<double>::infinity();
+    double minY =  std::numeric_limits<double>::infinity();
+    double maxY = -std::numeric_limits<double>::infinity();
+
+    struct BB { id_type id; BoundingBox bb; double cx, cy; };
+    std::vector<BB> nodes;
+    nodes.reserve(byId.size());
+
+    for (const auto& [id, node] : byId) {
+        BoundingBox r = node->getBoundingBox();
+        double cx = 0.5 * (r.x + r.X);
+        double cy = 0.5 * (r.y + r.Y);
+        nodes.push_back({id, r, cx, cy});
+
+        minX = std::min(minX, cx);
+        maxX = std::max(maxX, cx);
+        minY = std::min(minY, cy);
+        maxY = std::max(maxY, cy);
+    }
+    if (nodes.empty()) return;
+
+    const double eps = 1e-9;
+    double width   = std::max(eps, maxX - minX);
+    double height  = std::max(eps, maxY - minY);
+    double curAR   = width / height;
+
+    // Decide scale factors
+    //maybe I scale if it is very far from AR
+    double sx = 1.0, sy = 1.0;
+    if (targetAR > curAR)       sx = targetAR / curAR;        // widen
+    else if (targetAR < curAR)  sy = curAR / targetAR;        // stretch
+    else return;  // already matching
+
+    // Global center (to avoid drift)
+    const double gx = 0.5 * (minX + maxX);
+    const double gy = 0.5 * (minY + maxY);
+
+    // rescale bounding boxes around global centre
+    for (const auto& n : nodes) {
+        double cxNew = gx + sx * (n.cx - gx);
+        double cyNew = gy + sy * (n.cy - gy);
+
+        double halfW = 0.5 * (n.bb.X - n.bb.x);
+        double halfH = 0.5 * (n.bb.Y - n.bb.y);
+
+        BoundingBox newBB;
+        newBB.x = cxNew - halfW;
+        newBB.X = cxNew + halfW;
+        newBB.y = cyNew - halfH;
+        newBB.Y = cyNew + halfH;
+
+        // update rectangle directly
+        core.getNodeLookup().at(n.id)->setBoundingBox(newBB.x,newBB.X,newBB.y,newBB.Y);
+    }
+
+    //I use updateColaGraphRep with setNeedNewRectangles= true to update the rectangles positions.
+    core.setNeedNewRectangles(true);
+    core.updateColaGraphRep();
+
+}
+
+static void seedCoreRadially(Graph& core)
+{
+    const auto& byId = core.getNodeLookup();
+    if (byId.empty()) return;
+
+    struct BB { id_type id; BoundingBox bb; double cx, cy; };
+    std::vector<BB> nodes;
+    nodes.reserve(byId.size());
+
+    for (const auto& [id, node] : byId) {
+        BoundingBox r = node->getBoundingBox();
+        double cx = 0.5 * (r.x + r.X);
+        double cy = 0.5 * (r.y + r.Y);
+        nodes.push_back({id, r, cx, cy});
+    }
+
+    const size_t n = nodes.size();
+    if (n == 0) return;
+
+    const double meanS = core.computeAvgNodeDim();
+    const double R = std::max(100.0, 2.0 * meanS * std::sqrt(double(n)));
+    const double PI = 3.14159265358979323846;
+
+    // Compute global centre of current layout
+    double gx = 0.0, gy = 0.0;
+    for (const auto& n : nodes) { gx += n.cx; gy += n.cy; }
+    gx /= n; gy /= n;
+
+    // Position nodes on a circle (radial)
+    for (size_t k = 0; k < n; ++k) {
+        const double theta = (2.0 * PI * k) / double(n);
+        const double cxNew = gx + R * std::cos(theta);
+        const double cyNew = gy + R * std::sin(theta);
+
+        double halfW = 0.5 * (nodes[k].bb.X - nodes[k].bb.x);
+        double halfH = 0.5 * (nodes[k].bb.Y - nodes[k].bb.y);
+
+        BoundingBox newBB;
+        newBB.x = cxNew - halfW;
+        newBB.X = cxNew + halfW;
+        newBB.y = cyNew - halfH;
+        newBB.Y = cyNew + halfH;
+
+        core.getNodeLookup().at(nodes[k].id)->setBoundingBox(newBB.x, newBB.X, newBB.y, newBB.Y);
+    }
+
+    //core.setNeedNewRectangles(true);
+    core.updateColaGraphRep();
+}
+
+static void fdScatterLoopForTargetAR(Graph& core, unsigned int ln,
+                                     double tolFrac   = 0.10,   // accept if within ±10%
+                                     int    maxTries  = 20,
+                                     uint32_t rngSeed = 12345U)//fixed seed for reducability
+{
+
+
+    const auto& byId = core.getNodeLookup();
+    if (byId.empty()) return;
+
+    double computeAR_now = computeAspectRatio(core);
+
+    // save the current positions of all nodes
+    struct Snap { id_type id; double x, y; };
+    auto snapshot = [&]() {
+        std::vector<Snap> s; s.reserve(core.getNodeLookup().size());
+        for (const auto& [id, node] : core.getNodeLookup()) {
+            BoundingBox bb = node->getBoundingBox();
+            s.push_back({id, 0.5 * (bb.x + bb.X), 0.5 * (bb.y + bb.Y)});
+        }
+        return s;
+    };
+
+    //put nodes back to the saved positions.
+    //we need this because some random tries will be worse
+    //at the end we want to restore the best one we saw.
+    auto restore  = [&](const std::vector<Snap>& s) {
+        for (const auto& p : s) {
+            auto it = core.getNodeLookup().find(p.id);
+            if (it != core.getNodeLookup().end()) it->second->setCentre(p.x, p.y);
+        }
+    };
+
+    // Baseline best = current layout (before any scatter)
+    std::vector<Snap> bestSnap = snapshot(); // start with current layout as best
+    //compute how far the current AR is from the target
+    double bestErr = std::abs(computeAR_now - GLOBAL_ASPECT_RATIO) / GLOBAL_ASPECT_RATIO;
+
+    const double lo = (1.0 - tolFrac) * GLOBAL_ASPECT_RATIO;
+    const double hi = (1.0 + tolFrac) * GLOBAL_ASPECT_RATIO;
+
+
+    std::mt19937 rng(rngSeed);
+    std::uniform_real_distribution<double> U(-0.5, 0.5); // uniform on [-0.5, +0.5]
+    int tries = 0;
+
+    // If already within tolerance, nothing to do
+    double ar = computeAR_now;
+    BoundingBox B = core.getBoundingBox();
+    const double cx = B.centre().x;
+    const double cy = B.centre().y;
+    const double W  = (B.X - B.x);
+    const double H  = (B.Y - B.y);
+
+    while ((ar < lo || ar > hi) && tries < maxTries) {
+
+        double scatterScale = std::sqrt(byId.size()) * 10.0; //
+
+        for (const auto& [id, node] : byId) {
+            double x =   U(rng);
+            double y =  U(rng);
+            node->setCentre(x, y);
+        }
+
+
+
+        //save the stress before
+        double stressBaseline = finalStress;
+
+        // Free FD polish
+        core.destress();
+
+        // Evaluate and remember best
+        //ar = computeAR_now;
+        ar = computeAspectRatio(core);
+        double errAR = std::abs(ar - GLOBAL_ASPECT_RATIO) / GLOBAL_ASPECT_RATIO;
+        double currStress = finalStress;
+        std::cout<<"stressBaseline " <<stressBaseline << "currStress " <<currStress <<std::endl;
+        double stressNorm = currStress / (1.0 + stressBaseline); // avoid div/0, or normalize
+        double alpha =0.5; // trade off aspect ratio error vs stress
+        double score = alpha * errAR + (1.0 - alpha) * stressNorm;
+        printAspectRatio(core, "core_seed_");
+        std::cout <<"err " << errAR << "  bestErr "<<bestErr<< std::endl;
+        if (score < bestErr) {
+            bestErr = errAR;
+            bestSnap = snapshot();
+        }
+
+        ++tries;
+    }
+
+    // Restore the best attempt
+    restore(bestSnap);
+
+}
+double computeDensity(int numNodes, int numEdges) {
+    if (numNodes <= 1) return 0.0;
+    return static_cast<double> (numNodes) /static_cast<double> (numEdges);
+    //return (2.0 * numEdges) / (numNodes * (numNodes - 1));
+}
+
+void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
+    struct Snap {
+        id_type id;
+        double x, y;
+    };
+    // Save current positions of all nodes
+    auto snapshot = [&](Graph G) {
+        std::vector<Snap> s;
+        s.reserve(G.getNodeLookup().size());
+        for (const auto& [id, node] : G.getNodeLookup()) {
+            BoundingBox bb = node->getBoundingBox();
+            s.push_back({id, 0.5 * (bb.x + bb.X), 0.5 * (bb.y + bb.Y)});
+        }
+        return s;
+    };
+
+    // Restore saved positions
+    auto restore = [&](Graph& G, const std::vector<Snap>& s) {
+        for (const auto& p : s) {
+            auto it = G.getNodeLookup().find(p.id);
+            if (it != G.getNodeLookup().end()) {
+                it->second->setCentre(p.x, p.y);
+            }
+        }
+    };
+
+    static auto overallStart = timeNow();
     // If there's no edges, there's nothing to do.
     if (G.getNumEdges() == 0) return;
 
@@ -93,20 +363,33 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     // Pad nodes
     double nodePadding = holaOpts.nodePaddingScalar*IEL;
     G.padAllNodes(nodePadding, nodePadding);
+
     // We need to dismantle the graph, so we begin by making a copy and we work on that instead.
     // We allocate this copy on the heap, and manage it with a shared ptr, since many of our tools
     // require that.
     Graph_SP Gcopy = std::make_shared<Graph>(G);
     // Clear any existing connector routes, for better logging output.
     Gcopy->clearAllRoutes();
+// double graphDensity = computeDensity(Gcopy->getNumNodes(), Gcopy->getNumEdges());
+//     std:: cout<< "graphDensity " << graphDensity << std::endl;
 
     // Peel.
     Trees trees = peel(*Gcopy);
+    //save a copy of the node positions for the iterations later of the FD with many ARs
+    std::vector<Snap> baselineCore = snapshot(*Gcopy);
+
     // After peeling, the input graph is peeled down to its own core.
     // Ac-cor-dingly : ) we rename it...
     Graph_SP &core = Gcopy;
 
+
     log(*core, string_format("%02d_core", ln++));
+
+//scale core to the target AR, not sure if this helps
+    //scaleCoreToTargetAR(*core);
+
+    // log(*core, string_format("%02d_core_scaled", ln++));
+    // printAspectRatio(*core, "core_scaled");
 
     // If it's just a tree, layout and quit.
     // We recognise this case by there being exactly one tree, containing the same number of
@@ -139,29 +422,223 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
 
     // Otherwise we do have a core and trees.
 
-    // Start with a plain destress -- no constraints, no overlap prevention -- in order to begin
-    // giving the nodes a reasonable distribution in the plane.
+     auto t0 = timeNow();
     core->destress();
-
+      auto t1 = timeNow();
     log(*core, string_format("%02d_free_destress_core", ln++));
     printAspectRatio(*core, "free_destress_core");
+    printDuration("Free destress core", t0, t1);
 
-    // Now destress again, this time removing any node overlaps.
+    double freeDestressAR = computeAspectRatio(*core);
+    //
+    //reshufle the nodes if the AR is not reached
+    fdScatterLoopForTargetAR(*core,ln);
+    printAspectRatio(*core, "free_destress_core");
+    log(*core, string_format("%02d_free_destress_core", ln++));
+    freeDestressAR = computeAspectRatio(*core);
+
+    int retries =0 ;
+    int maxRetries =6;
+    //************* change the layout of the core from random to radial
+    //if (false||freeDestressAR < 0.9 * GLOBAL_ASPECT_RATIO || freeDestressAR > 1.1 * GLOBAL_ASPECT_RATIO)
+    // if(false)
+    // {
+    //     seedCoreRadially(*core);
+    //     log(*core, "core_seed_radial");
+    //     printAspectRatio(*core, "core_seed_radial");
+    //     auto t0 = timeNow();
+    //     core->destress();
+    //     auto t1 = timeNow();
+    //     log(*core, string_format("%02d_free_destress_core", ln++));
+    //     printAspectRatio(*core, "free_destress_core");
+    //     printDuration("Free destress core", t0, t1);
+    // }
+    //Now destress again, this time removing any node overlaps.
+
+
+
     ColaOptions colaOpts;
     colaOpts.preventOverlaps = true;
+    t0 = timeNow();
     core->destress(colaOpts);
+    t1 = timeNow();
 
-    log(*core, string_format("%02d_OP_destress_core", ln++));
+    //double corrected_AR;
+    double AR_Hold = GLOBAL_ASPECT_RATIO;
     printAspectRatio(*core, "OP_destress_core");
-    // Layout the hubs.
+    printDuration("OP_destress_core ", t0, t1);
+    double OPDestressAR = computeAspectRatio(*core);
+    log(*core, string_format("%02d_OP_destress_core", ln++));
+    //return;
+    // double tolerance = 0.10;
+    // int maxTries = 5;
+    // int tries = 0;
+    //
+    // while (tries < maxTries) {
+    //     // retrieve the baseline positions of the core
+    //     //std::vector<Snap> testCore = baselineCore;
+    //     restore(*core, baselineCore);
+    //     core->setNeedNewRectangles(true);
+    //     core->updateColaGraphRep();
+    //     core->updateNodesFromRects();
+    //
+    //     //display to make sure it is the original
+    //     log(*core, string_format("%02d_itr", ln++));
+    //
+    //     // Run FD layout
+    //     colaOpts.preventOverlaps = false;
+    //     core->destress(colaOpts);
+    //     fdScatterLoopForTargetAR(*core,ln);
+    //     printAspectRatio(*core, "f_destress_core");
+    //     colaOpts.preventOverlaps = true;
+    //     core->destress(colaOpts);
+    //     printAspectRatio(*core, "OP2_destress_core");
+    //
+    //     //compute the AR
+    //     double AR_actual = computeAspectRatio(*core);
+    //     log(*core, string_format("%02d_itr1", ln++));
+    //     double errorRatio = AR_actual / AR_Hold;
+    //     double diff = AR_actual - AR_Hold;
+    //     double relError = std::abs(diff) / AR_Hold;
+    //
+    //     if (std::abs(AR_actual - AR_Hold)  < tolerance) {
+    //
+    //         break;
+    //     }
+    //
+    //
+    //     // Adjust GLOBAL_ASPECT_RATIO
+    //     if (diff > 0.0) {
+    //         corrected_AR = GLOBAL_ASPECT_RATIO - 0.1 ;
+    //     }
+    //     else {
+    //         corrected_AR = GLOBAL_ASPECT_RATIO +0.1;
+    //     }
+    //
+    //
+    //     GLOBAL_ASPECT_RATIO = corrected_AR;
+    //
+    //     std::cout <<"AR_actual: "<<AR_actual <<" corrected_AR "<<corrected_AR<<"GLOBAL_ASPECT_RATIO " <<GLOBAL_ASPECT_RATIO <<std::endl;
+    //     tries++;
+    // }
+
+
+    int tries = 0;
+double corrected_AR = GLOBAL_ASPECT_RATIO;
+double prevAR = 0.0;
+double prevGlobalAR = GLOBAL_ASPECT_RATIO;
+
+// feedback parameters
+double k0 = 0.6;      // initial feedback gain (controls how aggressively AR is corrected)
+double decay = 0.85;  // exponential damping of gain per iteration
+double tolerance = 0.10; // acceptable relative AR error (5%)
+int maxTries = 25;    // safety cap
+
+// while (tries < maxTries) {
+//
+//     // restore or reuse the layout baseline
+//     restore(*core, baselineCore);
+//     core->setNeedNewRectangles(true);
+//     core->updateColaGraphRep();
+//     core->updateNodesFromRects();
+//
+//     log(*core, string_format("%02d_itr", ln++));
+//
+//
+//     colaOpts.preventOverlaps = false;
+//     core->destress();
+//     fdScatterLoopForTargetAR(*core, ln);
+//
+//     colaOpts.preventOverlaps = true;
+//     core->destress(colaOpts);
+//     printAspectRatio(*core, "OP2_destress_core");
+//
+//     // measure achieved aspect ratio
+//     double AR_actual = computeAspectRatio(*core);
+//     double arError = AR_actual - AR_Hold;
+//     double relError = std::abs(arError) / AR_Hold;
+//
+//     std::cout << std::fixed << std::setprecision(3)
+//               << "[AR loop] iter=" << tries
+//               << "  target=" << AR_Hold
+//               << "  actual=" << AR_actual
+//               << "  relErr=" << relError;
+//
+//     // convergence check
+//     if (relError < tolerance) {
+//         std::cout << "   converged\n";
+//         break;
+//     }
+//
+//     //compute adaptive feedback gain
+//     double kBase = k0 * std::pow(decay, tries);           // exponentially decreasing base
+//     double kErr  = std::clamp(0.3 + 0.4 * relError, 0.3, 0.8); // stronger when error large
+//     double k = std::clamp(kBase * kErr, 0.2, 0.8);        // combined gain, bounded
+//
+//     // optional sensitivity damping (if previous step exists)
+//     if (tries > 0) {
+//         double sens = (AR_actual - prevAR) /
+//                       (GLOBAL_ASPECT_RATIO - prevGlobalAR + 1e-9);
+//         double sensFactor = 1.0 / (std::abs(sens) + 1.0);
+//         k *= sensFactor; // downscale if system too sensitive
+//     }
+//
+//     // proportional feedback update
+//     prevGlobalAR = GLOBAL_ASPECT_RATIO;
+//     GLOBAL_ASPECT_RATIO -= k * arError;  // main correction
+//     prevAR = AR_actual;
+//
+//     std::cout << "  k=" << k
+//               << "  newGlobalAR=" << GLOBAL_ASPECT_RATIO << std::endl;
+//
+//     tries++;
+//     std::cout <<"AR_actual: "<<AR_actual <<" corrected_AR "<<corrected_AR<<"GLOBAL_ASPECT_RATIO " <<GLOBAL_ASPECT_RATIO <<std::endl;
+//     tries++;
+// }
+
+    //scale the result if it is not within AR
+    // scaleCoreToTargetAR(*core);
+    log(*core, string_format("%02d_core_scaled", ln++));
+    printAspectRatio(*core, "core_scaled");
+    //GLOBAL_ASPECT_RATIO = AR_Hold;
+    double scaledOPDestressAR = computeAspectRatio(*core);
+
+
+    //destress rounds with the previous failed layout is not good
+    //it is very hard for the nodes after settlement to change their positions.
+    // while ((OPDestressAR < 0.9 * GLOBAL_ASPECT_RATIO || OPDestressAR > 1.1 * GLOBAL_ASPECT_RATIO)&& retries < maxRetries) {
+    //     auto t0 = timeNow();
+    //     core->destress();
+    //     auto t1 = timeNow();
+    //     log(*core, string_format("%02d_op_destress_core2", ln++));
+    //     printAspectRatio(*core, "op_destress_core2");
+    //     printDuration("op destress core2", t0, t1);
+    //     OPDestressAR = computeAspectRatio(*core);
+    //     //std::cout<<"CORE node number after "<<core->getNumNodes()<<std::endl;
+    //     //**********************
+    //     retries ++;
+    // }
+
+
+    //ARlogFile << "v" << G.getNumNodes() << "e" << G.getNumEdges()<< "," << GLOBAL_ASPECT_RATIO << "," << freeDestressAR << "," << OPDestressAR << ","<<scaledOPDestressAR<< "\n";
+
+
+
+    // Layout the hubs. nodes with degree 3 or higher
     nli(ln);
     OrthoHubLayoutOptions ohlOpts;
     ohlOpts.avoidFlatTriangles = holaOpts.orthoHubAvoidFlatTriangles;
     OrthoHubLayout ohl(core, ohlOpts);
+    t0 = timeNow();
     ohl.layout(logger);
+    t1 = timeNow();
 
     log(*core, string_format("%02d_core_ortho_hub", ln++));
     printAspectRatio(*core, "core_ortho_hub");
+    printDuration("core_ortho_hub ", t0, t1);
+    double coreOrtoHubAR = computeAspectRatio(*core);
+
+
     // Set extra gap for boundary constraints.
     core->getSepMatrix().setExtraBdryGap(IEL/2.0);
 
@@ -169,16 +646,29 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     // distribution for the nodes that remain unconstrained, and perhaps regain natural symmetries.
     // This time, besides just preventing overlaps between nodes, we also prevent any nodes from
     // overlapping with aligned edges.
+
+    //the idea is to insert invisible “edgenodes” along these aligned edges and treat them like real nodes
+    //adding constraints to force space between them and the original nodes.
+    //Z: here I think we should either shut down the biased distances or adapt it to the AR.
     colaOpts.solidifyAlignedEdges = true;
     colaOpts.logger = logger;
     nli(ln);
+
+    t0 = timeNow();
     core->destress(colaOpts);
+    t1 = timeNow();
 
     log(*core, string_format("%02d_EOP_destress_core", ln++));
     printAspectRatio(*core, "EOP_destress_core");
+    printDuration("EOP_destress_core ", t0, t1);
     // Next we lay out the links.
     // We may or may not build Chains for this process. Later we will need to know whether chains
     // were built, so the vector of Chains is declared at this scope.
+    double EOP_destress_core = computeAspectRatio(*core);
+
+
+
+
     Chains chains;
     if (holaOpts.useACAforLinks) {
         // Use ACA.
@@ -214,15 +704,30 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     double preRoutingGapIELScalar = 0.125;
     double preRoutingGap = preRoutingGapIELScalar*IEL;
     core->padAllNodes(preRoutingGap, preRoutingGap);
+    t0 = timeNow();
     core->destress(colaOpts);
+    t1 = timeNow();
     core->padAllNodes(-preRoutingGap, -preRoutingGap);
     if (holaOpts.useACAforLinks) {
         log(*core, string_format("%02d_core_link_config_ACA", ln++));
         printAspectRatio(*core, "core_link_config_ACA");
+        printDuration("core_link_config_ACA ", t0, t1);
     } else {
         log(*core, string_format("%02d_core_link_config_Chains", ln++));
     }
 
+    //scaleCoreToTargetAR(*core);
+
+    // log(*core, string_format("%02d_core_scaled", ln++));
+    // printAspectRatio(*core, "core_scaled");
+
+    double core_link_config_ACA = computeAspectRatio(*core);
+    // ARlogFile << "v" << G.getNumNodes() << "e" << G.getNumEdges()<< "," << GLOBAL_ASPECT_RATIO
+    // << "," << freeDestressAR << "," << OPDestressAR << "," << coreOrtoHubAR <<","<<EOP_destress_core<<","
+    // << core_link_config_ACA
+    // <<"\n";
+
+    //return;
     // Next is the phase in which we planarise the core.
     // However, we want a 4-planar orthogonal layout with no leaves for this phase, so we first
     // perform a special orthogonal connector routing, which ensures that no nodes will become
@@ -230,31 +735,68 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     // least two distinct sides of each node.)
     LeaflessOrthoRouter lor(core, holaOpts);
     nli(ln);
+    t0 = timeNow();
     lor.route(logger);
+    t1 = timeNow();
     ++ln;
 
     log(*core, string_format("%02d_core_leafless_ortho_route", ln++));
     printAspectRatio(*core, "core_leafless_ortho_route");
+    printDuration("core_leafless_ortho_route ", t0, t1);
+    double core_leafless_ortho = computeAspectRatio(G);
+    //create dummy nodes for every bend
     OrthoPlanariser op(core);
+    t0 = timeNow();
     Graph_SP P = op.planarise();
+    t1 = timeNow();
 
     log(*P, string_format("%02d_planar_graph_P", ln++));
-    printAspectRatio(*core, "planar_graph_P");
+    printAspectRatio(*P, "planar_graph_P");
+    printDuration("planar_graph_P ", t0, t1);
+    auto before = G.computeEdgeLengths();
     // Set extra gap for boundary constraints.
     P->getSepMatrix().setExtraBdryGap(IEL/2.0);
+
     // Destress the new planar graph P, aiming to regain possible natural symmetries.
     // But use overlap prevention so that the structure cannot change.
     // (Note that now /all/ edges are aligned, so we have total edge-node overlap prevention.)
+
+
+
     colaOpts.preventOverlaps = true;
     colaOpts.solidifyAlignedEdges = true;
     nli(ln);
+    t0 = timeNow();
     P->destress(colaOpts);
+    t1 = timeNow();
 
     log(*P, string_format("%02d_P_EOP_destress", ln++));
-    printAspectRatio(*core, "P_EOP_destress");
+    printAspectRatio(*P, "P_EOP_destress");
+    printDuration("P_EOP_destress ", t0, t1);
+
+    double P_EOP_destress = computeAspectRatio(*P);
+    //auto after = G.computeEdgeLengths();
+
+    //debug the edges that changed
+    // for (auto &entry : before) {
+    //     auto sid = entry.first.first;
+    //     auto tid = entry.first.second;
+    //
+    //     double oldLen = entry.second;
+    //     double newLen = after[{sid, tid}];
+    //
+    //     std::cout << "Edge " << sid << "-" << tid
+    //               << " old=" << oldLen
+    //               << " new=" << newLen
+    //               << " change=" << (newLen - oldLen)
+    //               << std::endl;
+    // }
+
+GLOBAL_ASPECT_RATIO = AR_Hold;
     // Now we want to reattach the trees, choosing faces of the planarised core in which to
     // place them.
     // First the trees need their own symmetric layout.
+    t0 = timeNow();
     unsigned lns = 0;  // initialise logging sub-index
     for (Tree_SP tree : trees) {
         tree->symmetricLayout(
@@ -268,11 +810,13 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
 
     ++ln;
     nli(ln);
+
     // Now we can choose faces and reattach them.
     FaceSet_SP faceSet = reattachTrees(P, trees, holaOpts, logger);
     ++ln;
     // We will need the vector of chosen tree placements.
     TreePlacements tps = faceSet->getAllTreePlacements();
+
 
     // Next we insert the actual trees back into the planar graph.
     // The trees come with buffer nodes. We build a record of those, so they can be
@@ -290,9 +834,12 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         bufferNodes.insert(buffNodes.begin(), buffNodes.end());
         colaOpts.nodeClusters.push_back(treeNodes);
     }
-
+    t1 = timeNow();
     log(*P, string_format("%02d_P_with_trees", ln++));
-    printAspectRatio(*core, "P_with_trees");
+    printAspectRatio(*P, "P_with_trees");
+    printDuration("P_with_trees ", t0, t1);
+
+    double with_trees = computeAspectRatio(*P);
     // We don't need solid edges within the trees; moreover, this would cause constraint
     // conflicts since the tree nodes now belong to clusters to which their solid edges
     // would not belong.
@@ -304,14 +851,21 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     // with RectangularClusters.
     colaOpts.useMajorization = false;
 
+    GLOBAL_ASPECT_RATIO = corrected_AR;
+    std::cout<< "GLOBAL_ASPECT_RATIO "<< GLOBAL_ASPECT_RATIO <<std::endl;
     nli(ln);
+    t0 = timeNow();
     P->destress(colaOpts);
-
+    t1 = timeNow();
     log(*P, string_format("%02d_P_nbr_destress", ln++));
-    printAspectRatio(*core, "P_nbr_destress");
-    // Do near alignments.
+    printAspectRatio(*P, "P_nbr_destress");
+    printDuration("P_nbr_destress ", t0, t1);
+
+    double Pnbr = computeAspectRatio(*P);
+    //Do near alignments.
     if (holaOpts.do_near_align) {
         AlignmentTable atab(*P, bufferNodes);
+        t0 = timeNow();
         for (size_t i = 0; i < holaOpts.align_reps; ++i) {
             doNearAlignments(*P, atab, bufferNodes, holaOpts);
             // After each attempt to add alignment constraints, destress, again using
@@ -320,8 +874,11 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
             P->destress(colaOpts);
             log(*P, string_format("%02d_P_near_alignments", ln++));
         }
-        printAspectRatio(*core, "P_near_alignments");
+        t1 = timeNow();
+        printAspectRatio(*P, "P_near_alignments");
+        printDuration("P_near_alignments ", t0, t1);
     }
+    double near_alignments = computeAspectRatio(*P);
 
     // Delete buffer nodes.
     P->removeNodes(bufferNodes);
@@ -338,6 +895,7 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         auto counts = faceSet->getNumTreesByGrowthDir(scaleBySize);
         if ((w < h && holaOpts.preferredAspectRatio == AspectRatioClass::LANDSCAPE) ||
             (h < w && holaOpts.preferredAspectRatio == AspectRatioClass::PORTRAIT)) {
+            std::cout<<"preferredAspectRatio "<<std::endl;
             // Need to rotate 90 degrees to get preferred aspect ratio.
             // There are two ways to do this (clockwise and anticlockwise).
             // In order to choose one, consult the preferred tree growth direction.
@@ -364,6 +922,7 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
             }
             ln += 2;
         } else {
+            std::cout<<"rotate only "<<std::endl;
             // In this case we may rotate 180 degrees if that would put more trees in the preferred
             // growth direction.
             CardinalDir q = holaOpts.preferredTreeGrowthDir,
@@ -395,7 +954,8 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
         P->translate(dx, dy);
 
         log(*P, string_format("%02d_P_translation", ln++));
-        printAspectRatio(*core, "P_translation");
+        printAspectRatio(*P, "P_translation");
+
     }
 
 
@@ -431,7 +991,7 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
     RoutingAdapter ra(Avoid::OrthogonalRouting);
     ra.router.setRoutingOption(Avoid::nudgeOrthogonalSegmentsConnectedToShapes, true);
     ra.router.setRoutingOption(Avoid::nudgeSharedPathsWithCommonEndPoint, true);
-    ra.router.setRoutingParameter(Avoid::crossingPenalty, 2*IEL);
+    ra.router.setRoutingParameter(Avoid::crossingPenalty, 2*IEL);//increase it if you do not want edge crossings
     ra.router.setRoutingParameter(Avoid::segmentPenalty, IEL/2.0);
     ra.router.setRoutingParameter(Avoid::idealNudgingDistance, holaOpts.routingAbs_nudgingDistance);
     // Ask the core graph to add its nodes, and just those edges that do not have any bend nodes.
@@ -460,4 +1020,12 @@ void dialect::doHOLA(Graph &G, const HolaOpts &holaOpts, Logger *logger) {
 
     // Remove remaining node padding.
     G.padAllNodes(-nodePaddingLayer2, -nodePaddingLayer2);
+    printAspectRatio(G, "Final AR");
+    double finalAR = computeAspectRatio(G);
+
+    static auto overallEnd = timeNow();
+
+    ARlogFile << "v" << G.getNumNodes() << "e" << G.getNumEdges()<< "," << AR_Hold << "," << freeDestressAR << "," << OPDestressAR << "," << scaledOPDestressAR <<"," << coreOrtoHubAR <<","<<EOP_destress_core<<","<< core_link_config_ACA <<","<< core_leafless_ortho << "," << P_EOP_destress<<","<< with_trees <<","<< Pnbr<< ","<< near_alignments<<"," << finalAR <<"\n";
+    printDuration("Total HOLA time", overallStart, overallEnd);
+    GLOBAL_ASPECT_RATIO = AR_Hold;
 }

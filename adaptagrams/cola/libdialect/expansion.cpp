@@ -41,6 +41,7 @@
 #include "libdialect/expansion.h"
 #include "libdialect/ortho.h"
 #include "libdialect/constraints.h"
+#include "libdialect/nodeconfig.h"
 
 using namespace dialect;
 
@@ -101,9 +102,143 @@ void ExpansionManager::computeGoals(vpsc::Dim dim) {
     }
 }
 
+BoundingBox getBoundingBoxForNode(Node_SP node, const Point &offset = Point(0, 0)) {
+    Point center = node->getCentre();
+    dimensions dims = node->getDimensions();
+    double w = dims.first;
+    double h = dims.second;
+
+    double xMin = center.x - w / 2.0 + offset.x;
+    double xMax = center.x + w / 2.0 + offset.x;
+    double yMin = center.y - h / 2.0 + offset.y;
+    double yMax = center.y + h / 2.0 + offset.y;
+
+    return BoundingBox(xMin, yMin, xMax, yMax);
+}
+BoundingBox expandBoundingBoxes(const BoundingBox &a, const BoundingBox &b) {
+    return BoundingBox(
+            std::min(a.x, b.x),
+            std::min(a.y, b.y),
+            std::max(a.X, b.X),
+            std::max(a.Y, b.Y)
+    );
+}
 double ExpansionManager::estimateCost(void) const {
     std::map<vpsc::Dim, double> costByDim = estimateCostByDimension();
-    return costByDim.at(vpsc::XDIM) + costByDim.at(vpsc::YDIM);
+    //eturn costByDim.at(vpsc::XDIM) + costByDim.at(vpsc::YDIM);
+
+
+
+//Z: adding penalty term based on how far the current width/height ratio is from my desired AR
+
+    double widthCost = costByDim.at(vpsc::XDIM);
+    double heightCost = costByDim.at(vpsc::YDIM);
+
+    //core box
+    const BoundingBox coreBox = m_tp->getFace().getGraph()->getBoundingBox();
+
+    //tree box
+    Node_SP treeBox   = m_tp->buildTreeBox(m_padding);
+    //the root (x, y) gives the anchor point in the global coordinates of the layout.
+    const Point  rootC = m_tp->getRootNode()->getCentre();
+    const Point  boxC  = treeBox->getCentre();
+    const auto   boxSz = treeBox->getDimensions(); // {w, h}
+
+    //absolute bounding box of the tree
+    const double tL = rootC.x + boxC.x - boxSz.first  / 2.0;
+    const double tR = rootC.x + boxC.x + boxSz.first  / 2.0;
+    const double tB = rootC.y + boxC.y - boxSz.second / 2.0;
+    const double tT = rootC.y + boxC.y + boxSz.second / 2.0;
+    //After this, I know where the tree would sit in the global drawing.
+
+    //new bounding box of the entire layout (core + this tree).
+    const double nL = std::min(coreBox.x, tL);
+    const double nR = std::max(coreBox.X, tR);
+    const double nB = std::min(coreBox.y, tB);
+    const double nT = std::max(coreBox.Y, tT);
+
+    const double projectedW  = std::max(1e-9, nR - nL);
+    const double projectedH  = std::max(1e-9, nT - nB);
+    const double projectedAR = projectedW / projectedH;
+
+    // Axis bias: gently prefer pushes that correct AR
+    const double wantAR = std::max(1e-9, GLOBAL_ASPECT_RATIO);
+    double wX = 1.0, wY = 1.0;
+    //A 15% discount is enough to nudge choices toward AR correction without drowning out space
+    //If i make it too strong (e.g., 0.5), i get odd placements that ignore real shortage; too weak (e.g., 0.95) and it won’t move at all
+    if (wantAR > projectedAR) wX = 0.85;          // need wider  → cheaper X
+    else if (wantAR < projectedAR) wY = 0.85;     // need taller → cheaper Y
+
+    double spaceCost = wX * widthCost + wY * heightCost;
+
+    // smooth, symmetric AR penalty (log^2), scaled by leverage
+    const double logRatio  = std::log(projectedAR / wantAR);
+    const double arPenalty = logRatio * logRatio;
+
+    const double coreArea = std::max(1e-9, (coreBox.X - coreBox.x) * (coreBox.Y - coreBox.y));
+    const double treeArea = std::max(1e-9, boxSz.first * boxSz.second);
+
+    //down-weights the AR penalty for small trees so they don’t “over-steer” the whole layout; larger trees get leverage ≈ 1.
+    //0.75 Controls how much the tree’s size matters when applying the AR penalty.
+    // if 1 then leverage ≈ linear in size. Very conservative and small trees have almost no influence.
+    //if 0.5 then leverage is square-root. even small trees keep a noticeable say. Aggressive: AR penalty still strong for small trees.
+    //0.75 = balance: small trees contribute a little, large trees still dominate appropriately.
+    //cap at 1.0 so that even the largest tree never counts more than full influence.
+    //imagine a tree that is very large, say its box area is bigger than the core then treeArea / coreArea >1
+    const double leverage = std::min(1.0, std::pow(treeArea / coreArea, 0.75));
+
+    const double IEL           = m_tp->getFace().getGraph()->getIEL();
+    //500 typically makes AR matter visibly but not overwhelm space
+    const double penaltyWeight = 500.0 * IEL;  // tune 300–700 * IEL
+    double finalCost = spaceCost + leverage * penaltyWeight * arPenalty;
+
+
+    // double spaceCost = widthCost + heightCost;
+    // //
+    // // Estimate projected bounding box
+    // BoundingBox coreBox = m_tp->getFace().getGraph()->getBoundingBox(); //Gets the bounding box of the current core
+    // Node_SP treeBox = m_tp->buildTreeBox(m_padding); //bounding box node representing the tree
+    // Point rootCentre = m_tp->getRootNode()->getCentre(); //Gets the center of the root node
+    // Point boxCenter = treeBox->getCentre(); //Gets the center of the tree box
+    // dimensions boxSize = treeBox->getDimensions();
+    // //now compute where the tree will actually land in
+    // //translates the tree bounding box to its final global position
+    // double treeLeft   = rootCentre.x + boxCenter.x - boxSize.first / 2.0;
+    // double treeRight  = rootCentre.x + boxCenter.x + boxSize.first / 2.0;
+    // double treeBottom = rootCentre.y + boxCenter.y - boxSize.second / 2.0;
+    // double treeTop    = rootCentre.y + boxCenter.y + boxSize.second / 2.0;
+    //
+    // //compute the total dimensions of the graph with the new added tree
+    // double newLeft   = std::min(coreBox.x, treeLeft);
+    // double newRight  = std::max(coreBox.X, treeRight);
+    // double newBottom = std::min(coreBox.y, treeBottom);
+    // double newTop    = std::max(coreBox.Y, treeTop);
+    //
+    // double projectedWidth = newRight - newLeft;
+    // double projectedHeight = newTop - newBottom;
+    //
+    //
+    // double projectedAR = projectedWidth / projectedHeight;
+    //
+    // //smooth and symmetric penalty function for aspect ratio deviation
+    // //computes the logarithmic difference between the current and desired aspect ratios.
+    // //this way both overshooting and undershooting the target AR by the same ratio give the same penalty
+    // double logRatio = std::log(projectedAR / GLOBAL_ASPECT_RATIO);
+    // double arPenalty = logRatio * logRatio; //non-negative symmetric penalty
+    //
+    // double penaltyWeight = 500.0 * m_tp->getFace().getGraph()->getIEL();
+    // double finalCost = spaceCost + penaltyWeight * arPenalty;
+
+    // std::cout << "Tree ID: " << m_tp->id()
+    //           << " Total Cost: " << finalCost
+    //           << " (Space Cost: " << spaceCost
+    //           << ", AR Penalty: " << penaltyWeight * arPenalty
+    //           << ", AR: " << projectedAR << ")" << std::endl;
+    // std::cout << m_tp->toString()<<std::endl;
+
+    return finalCost;
+
+
 }
 
 std::map<vpsc::Dim, double> ExpansionManager::estimateCostByDimension(void) const {
@@ -111,6 +246,8 @@ std::map<vpsc::Dim, double> ExpansionManager::estimateCostByDimension(void) cons
     std::map<vpsc::Dim, double> costByDim;
     costByDim.insert({vpsc::XDIM, costByDir[CardinalDir::EAST] + costByDir[CardinalDir::WEST]});
     costByDim.insert({vpsc::YDIM, costByDir[CardinalDir::SOUTH] + costByDir[CardinalDir::NORTH]});
+
+
     return costByDim;
 }
 
@@ -140,6 +277,7 @@ std::map<vpsc::Dim, double> ExpansionManager::estimateCostByDimension2(void) con
 std::map<CardinalDir, double> ExpansionManager::estimateCostByDirection(void) const {
     std::map<CardinalDir, double> costs;
     // First we consider collateral expansion constraints, if any.
+    //what pushes are already required, even without this current tree?
     ProjSeq_SP ps0 = m_tp->getFace().computeCollateralProjSeq(m_tp, m_padding);
     // For each direction in which these constraints act (relative to
     // the root node of our TreePlacement), we want to know the maximum

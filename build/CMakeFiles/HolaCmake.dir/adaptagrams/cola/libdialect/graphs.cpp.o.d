@@ -312,7 +312,14 @@ CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/graphs.cpp.o: \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/util.h \
  /usr/include/c++/13/math.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/logging.h \
+ /usr/include/c++/13/fstream /usr/include/c++/13/bits/codecvt.h \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/c++io.h \
+ /usr/include/c++/13/bits/fstream.tcc \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/routing.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/opts.h \
  /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/graphs.h \
- /usr/include/c++/13/stack /usr/include/c++/13/bits/stl_stack.h
+ /usr/include/c++/13/stack /usr/include/c++/13/bits/stl_stack.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/nodeconfig.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/aca.h \
+ /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/quadaction.h

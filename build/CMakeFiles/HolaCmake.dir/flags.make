@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/home/alsuwazj/HolaCmake/adaptagrams/cola -I/home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect
 
-CXX_FLAGS = -g -std=gnu++20
+CXX_FLAGS = -std=gnu++20
 

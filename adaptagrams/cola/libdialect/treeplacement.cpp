@@ -179,6 +179,7 @@ TreePlacement_SP dialect::chooseBestPlacement(TreePlacements tps, HolaOpts opts)
                 bestPlacement = tp;
             }
         }
+        //std::cout<<"tree placed chosen: "<<std::endl << bestPlacement->toString()<<std::endl;
     }
 
     // By this point, we should always have made a choice.
@@ -194,7 +195,7 @@ std::string TreePlacement::toString(void) const {
     ss << ", Growing " << Compass::cardToString(m_growthDir);
     ss << (m_flip ? ", Flipped." : ".") << std::endl;
     ss << "    Rooted at Node " << m_faceRoot->id() << std::endl;
-    ss << "    Into " << m_face.toString() << std::endl;
+    //ss << "    Into " << m_face.toString() << std::endl;
     return ss.str();
 }
 

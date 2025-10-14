@@ -335,6 +335,34 @@ CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/sides.cpp -o CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.s
 
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o: CMakeFiles/HolaCmake.dir/flags.make
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o: /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/edges.cpp
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o: CMakeFiles/HolaCmake.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/alsuwazj/HolaCmake/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CXX object CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o -MF CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o.d -o CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o -c /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/edges.cpp
+
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/edges.cpp > CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.i
+
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/edges.cpp -o CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.s
+
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o: CMakeFiles/HolaCmake.dir/flags.make
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o: /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/planarise.cpp
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o: CMakeFiles/HolaCmake.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/alsuwazj/HolaCmake/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building CXX object CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o -MF CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o.d -o CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o -c /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/planarise.cpp
+
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/planarise.cpp > CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.i
+
+CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/alsuwazj/HolaCmake/adaptagrams/cola/libdialect/planarise.cpp -o CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.s
+
 # Object files for target HolaCmake
 HolaCmake_OBJECTS = \
 "CMakeFiles/HolaCmake.dir/main.cpp.o" \
@@ -355,7 +383,9 @@ HolaCmake_OBJECTS = \
 "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/quadaction.cpp.o" \
 "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libcola/cola.cpp.o" \
 "CMakeFiles/HolaCmake.dir/adaptagrams/cola/libcola/colafd.cpp.o" \
-"CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o"
+"CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o" \
+"CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o" \
+"CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o"
 
 # External object files for target HolaCmake
 HolaCmake_EXTERNAL_OBJECTS =
@@ -379,9 +409,11 @@ HolaCmake: CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/quadaction.cpp.o
 HolaCmake: CMakeFiles/HolaCmake.dir/adaptagrams/cola/libcola/cola.cpp.o
 HolaCmake: CMakeFiles/HolaCmake.dir/adaptagrams/cola/libcola/colafd.cpp.o
 HolaCmake: CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/sides.cpp.o
+HolaCmake: CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/edges.cpp.o
+HolaCmake: CMakeFiles/HolaCmake.dir/adaptagrams/cola/libdialect/planarise.cpp.o
 HolaCmake: CMakeFiles/HolaCmake.dir/build.make
 HolaCmake: CMakeFiles/HolaCmake.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/alsuwazj/HolaCmake/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Linking CXX executable HolaCmake"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/alsuwazj/HolaCmake/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Linking CXX executable HolaCmake"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/HolaCmake.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

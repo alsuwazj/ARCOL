@@ -27,16 +27,18 @@
 
 #include <string>
 #include <vector>
-
+#include <fstream>
 #include "libdialect/commontypes.h"
 
 namespace dialect {
-
+    extern std::string GraphName;
+    extern std::ofstream ARlogFile;
 struct Logger {
     std::string outputDir = "";
     std::string prefix = "";
     std::vector<std::string> contents;
     std::vector<std::string> names;
+
     bool hasOutputDir = false;
     bool hasPrefix = false;
     //! Control whether the logger writes to stdout the name of each file recorded:
@@ -76,6 +78,7 @@ struct Logger {
     //!         to write the full path.
     //! @return The full path.
     std::string writeFullPathForFilename(std::string name);
+
 
 };
 

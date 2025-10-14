@@ -96,6 +96,7 @@ class ExpansionGoal;
     results of equal quality.
  */
 class ExpansionManager {
+
 public:
     //! @brief  Standard constructor.
     //! @param[in] tp  The TreePlacement for which expansion is required.
@@ -111,6 +112,10 @@ public:
 
     //! @brief  Check whether a given dimension is transverse w.r.t. this manager's placement.
     bool isTransverse(vpsc::Dim dim) { return dim == m_transDim; }
+
+    BoundingBox getBoundingBoxForNode(Node_SP node, const Avoid::Point &offset = Avoid::Point(0, 0));
+
+    BoundingBox expandBoundingBoxes(const BoundingBox &a, const BoundingBox &b);
 
     //! @brief  Estimate the cost of expanding.
     double estimateCost(void) const;

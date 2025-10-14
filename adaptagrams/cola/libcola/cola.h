@@ -621,6 +621,7 @@ class TopologyAddonInterface
  */
 class ConstrainedFDLayout {
 public:
+
     /**
      * @brief Constructs a constrained force-directed layout instance.
      *
@@ -873,7 +874,8 @@ private:
             const std::valarray<double>& oldCoords,
             std::valarray<double> &coords, 
             const double oldStress, 
-            double stepsize
+            double stepsize,
+            const vpsc::Dim dim
             /*,topology::TopologyConstraints *s=nullptr*/);
     void computePathLengths(
             const std::vector<Edge>& es, std::valarray<double> eLengths);

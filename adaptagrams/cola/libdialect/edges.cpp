@@ -146,7 +146,7 @@ string Edge::writeSvg(void) const {
     }
     string d = isOrtho ? writeRoundedOrthoConnectorData() : writePolylineConnectorData();
     ostringstream ss;
-    ss << "<path stroke=\"black\" stroke-width=\"1\" fill=\"none\" ";
+    ss << "<path stroke=\"black\" stroke-width=\"2\" fill=\"none\" ";
     ss << "d=\"" << d << "\"/>\n";
     return ss.str();
 }

@@ -47,6 +47,8 @@
 #include "libdialect/graphs.h"
 #include "libdialect/aca.h"
 
+#include <nodeconfig.h>
+
 using std::vector;
 using std::string;
 using std::pair;
@@ -277,6 +279,7 @@ void ACALayout::createAlignments(void)
     if (m_allAtOnce) {
         acaLoopAllAtOnce();
     } else {
+        //this one used in hola
         acaLoopOneByOne();
     }
 }
@@ -1527,17 +1530,60 @@ bool ACALayout::badSeparation(int l, int r, ACASepFlag sf)
     }
     return false;
 }
+    //AR penelty
+double ACALayout::predictARDelta(int j, ACASepFlag sf)
+{
+    const double EPS = 1e-6;
+    double curW = m_graph->getBoundingBox().X - m_graph->getBoundingBox().x;
+    double curH = m_graph->getBoundingBox().Y - m_graph->getBoundingBox().y;
+    double predW = curW;
+    double predH = curH;
+
+    // Get edge endpoints
+    int src = alias(m_es[j].first);
+    int tgt = alias(m_es[j].second);
+    vpsc::Rectangle* s = getRect(src);
+    vpsc::Rectangle* t = getRect(tgt);
+
+    double sx = s->getCentreX(), sy = s->getCentreY();
+    double tx = t->getCentreX(), ty = t->getCentreY();
+
+    // Get compass direction offset for this OA
+    EdgeOffset offset = getEdgeOffsetForCompassDirection(j, sf);
+
+    if (sf & ACAEASTWEST) {
+        sy += offset.first;
+        ty += offset.second;
+        double newMinY = std::min(sy, ty);
+        double newMaxY = std::max(sy, ty);
+        predH = std::max(curH, newMaxY - newMinY);  // could shrink or expand
+    } else {
+        sx += offset.first;
+        tx += offset.second;
+        double newMinX = std::min(sx, tx);
+        double newMaxX = std::max(sx, tx);
+        predW = std::max(curW, newMaxX - newMinX);  // could shrink or expand
+    }
+
+    //if (predH < EPS) return std::numeric_limits<double>::infinity();
+
+    double predictedAR = predW / predH;
+    return std::abs(predictedAR - GLOBAL_ASPECT_RATIO) / GLOBAL_ASPECT_RATIO;
+}
+
 
 /// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 /// Penalty evaluation
 
 double ACALayout::computePenalty(int j, ACASepFlag sf)
 {
+    double AR_WEIGHT = 10000000;
     double p = 0;
     cola::Edge e = m_es.at(j);
     int src = e.first, tgt = e.second;
     // Basic penalty:
-    if (m_favourLongEdges) {
+    if (m_favourLongEdges) { // not in hola
+            cout<<"m_favourLongEdges"<<std::endl;
         // Length:
         p += lengthPenaltyForEdge(j);
     } else {
@@ -1549,6 +1595,12 @@ double ACALayout::computePenalty(int j, ACASepFlag sf)
     // Leaves:
     if (m_postponeLeaves) p += leafPenalty(src,tgt);
     //
+
+    //add AR Penelty
+    double arPenalty = AR_WEIGHT * predictARDelta(j, sf);
+    p += arPenalty;
+
+
     return p;
 }
 

@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <filesystem>
+#include <fstream>
 
 #include "libdialect/io.h"
 #include "libdialect/graphs.h"
@@ -32,6 +34,10 @@
 
 using namespace dialect;
 
+namespace dialect {
+    std::string GraphName = "unnamed";  // Actual storage + optional default value
+    std::ofstream ARlogFile("aspect_ratio_log.csv");
+}
 using std::string;
 using std::vector;
 
@@ -47,18 +53,29 @@ Logger::Logger(std::string outputDir, std::string prefix, bool verbose, bool add
 
 void Logger::log(std::string content, std::string name) {
     // At least we record the content.
+    // contents.push_back(content);
+    // // Was a name given?
+    // if (name.size() > 0) {
+    //     names.push_back(name);
+    //     // Write to stdout?
+    //     if (verbose) std::cout << "Log: " << name << std::endl;
+    //     // Do we have an output directory?
+    //     if (hasOutputDir) {
+    //         // Set prefix if provided.
+    //         if (hasPrefix) name = prefix + name;
+    //         // Write.
+    //         string path = outputDir + name;
+    //         writeStringToFile(content, path);
+    //     }
+    // }
+
     contents.push_back(content);
-    // Was a name given?
     if (name.size() > 0) {
         names.push_back(name);
-        // Write to stdout?
         if (verbose) std::cout << "Log: " << name << std::endl;
-        // Do we have an output directory?
+
         if (hasOutputDir) {
-            // Set prefix if provided.
-            if (hasPrefix) name = prefix + name;
-            // Write.
-            string path = outputDir + name;
+            string path = writeFullPathForFilename(name);
             writeStringToFile(content, path);
         }
     }
@@ -74,7 +91,17 @@ void Logger::log(Graph &G, std::string name) {
 }
 
 string Logger::writeFullPathForFilename(std::string name) {
-    if (hasPrefix) name = prefix + name;
-    string path = outputDir + name;
-    return path;
+    // if (hasPrefix) name = prefix + name;
+    // string path = outputDir + name;
+    // return path;
+    std::string fullName = name;
+    if (hasPrefix) {
+        fullName = prefix + "_" + fullName;
+    }
+    if (hasOutputDir) {
+        fullName = outputDir + "/" + fullName;
+    }
+    return fullName;
 }
+
+
