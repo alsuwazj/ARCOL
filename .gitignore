@@ -1,0 +1,7 @@
+# Ignore everything at root level
+/*
+
+# Allow only these
+!/adaptagrams
+!/main.cpp
+!/.gitignore
