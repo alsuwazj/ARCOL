@@ -1,0 +1,2 @@
+To build the project follow the procees in Adaptagrams code https://github.com/mjwybrow/adaptagrams
+To run, ./arcol ~/ARCOL/adaptagrams/cola/libdialect/test/graphs/metro/london.tglf  ../output.tglf4 1.0
